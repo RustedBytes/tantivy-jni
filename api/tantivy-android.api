@@ -19,6 +19,10 @@
 - fun f64(name: String, value: Double) = field(name, FieldValue.F64(value))
 - fun bool(name: String, value: Boolean) = field(name, FieldValue.Bool(value))
 - fun bytes(name: String, value: ByteArray) = field(name, FieldValue.Bytes(value))
+- fun date(name: String, value: java.time.Instant) = field(name, FieldValue.Date(value))
+- fun json(name: String, value: org.json.JSONObject) = field(name, FieldValue.Json(value))
+- fun facet(name: String, path: String) = field(name, FieldValue.Facet(path))
+- fun ipAddr(name: String, address: String) = field(name, FieldValue.IpAddr(address))
 - fun put(name: String, value: FieldValue) = field(name, value)
 - fun putAll(values: Map<String, FieldValue>) = values.forEach { (name, value) -> field(name, value) }
 - fun repeated(name: String, values: Iterable<FieldValue>) = values.forEach { field(name, it) }
@@ -46,6 +50,10 @@
 - data class Bool(val value: Boolean) : FieldValue()
 - class Bytes(value: ByteArray) : FieldValue()
 - fun toByteArray(): ByteArray = bytes.copyOf()
+- data class Date(val value: java.time.Instant) : FieldValue()
+- data class Json(val value: org.json.JSONObject) : FieldValue()
+- data class Facet(val path: kotlin.String) : FieldValue()
+- data class IpAddr(val address: kotlin.String) : FieldValue()
 
 ## com/rustedbytes/tantivy/IndexOptions.kt
 - data class IndexOptions( val create: Boolean = true, val writerThreads: Int = 1, val writerMemoryBytes: Int = 50_000_000, val dispatcher: CoroutineDispatcher = Dispatchers.IO, )
@@ -63,7 +71,7 @@
 - data class RefreshResult(val refreshed: Boolean)
 - data class CommitRefreshResult(val opstamp: Long, val refreshed: Boolean)
 - data class SearchPage(val totalHits: Int, val hits: List<SearchHit>)
-- data class SearchHit(val score: Float, val fields: Map<String, List<FieldValue>>)
+- data class SearchHit(val score: Float, val fields: Map<String, List<FieldValue>>, val snippets: Map<String, String> = emptyMap())
 - data class SchemaInfo(val fields: List<SchemaField>, val defaultSearchFields: List<String>)
 - interface DocumentMapper<T>
 - fun toDocument(value: T): IndexDocument
@@ -97,6 +105,10 @@
 - fun f64(name: String, stored: Boolean = true, indexed: Boolean = true, fast: Boolean = false) =
 - fun bool(name: String, stored: Boolean = true, indexed: Boolean = true, fast: Boolean = false) =
 - fun bytes(name: String, stored: Boolean = true, indexed: Boolean = true, fast: Boolean = false) =
+- fun date(name: String, stored: Boolean = true, indexed: Boolean = true, fast: Boolean = false) =
+- fun json(name: String, stored: Boolean = true, indexed: Boolean = true, fast: Boolean = false) =
+- fun facet(name: String, stored: Boolean = true) =
+- fun ipAddr(name: String, stored: Boolean = true, indexed: Boolean = true, fast: Boolean = false) =
 - fun field( name: String, type: FieldType, stored: Boolean = true, indexed: Boolean = true, fast: Boolean = false, tokenizer: TokenizerMode? = null, experimental: Boolean = false, )
 - fun defaultSearchFields(vararg names: String)
 - fun build(): IndexSchema = IndexSchema(fields.toList(), defaultSearchFields.distinct())
@@ -106,7 +118,7 @@
 - enum class SortOrder(internal val wireName: String)
 - data class SortRequest( val field: String, val order: SortOrder = SortOrder.Desc, )
 - fun toJsonObject(): JSONObject = JSONObject()
-- data class SearchRequest( val query: String, val limit: Int = 20, val offset: Int = 0, val defaultFields: List<String> = emptyList(), val selectedFields: List<String> = emptyList(), val sort: SortRequest? = null, val reloadBeforeSearch: Boolean = false, val flowOptions: SearchFlowOptions = SearchFlowOptions(), )
+- data class SearchRequest( val query: String, val limit: Int = 20, val offset: Int = 0, val defaultFields: List<String> = emptyList(), val selectedFields: List<String> = emptyList(), val sort: SortRequest? = null, val reloadBeforeSearch: Boolean = false, val countOnly: Boolean = false, val snippetFields: List<String> = emptyList(), val flowOptions: SearchFlowOptions = SearchFlowOptions(), )
 - fun toJson(): String = JSONObject()
 - typealias SearchQuery = SearchRequest
 - data class AdvancedSearchRequest( val request: SearchRequest, )
@@ -136,6 +148,8 @@
 - suspend fun add(document: IndexDocument): WriteResult = addAll(listOf(document))
 - suspend fun addAll(documents: List<IndexDocument>): WriteResult
 - suspend fun delete(field: String, value: FieldValue): DeleteResult =
+- suspend fun deleteQuery(query: String, defaultFields: List<String> = emptyList()): DeleteResult =
+- suspend fun deleteAll(): CommitResult =
 - suspend fun commit(): CommitResult
 - suspend fun refresh(): RefreshResult
 - suspend fun commitAndRefresh(): CommitRefreshResult
