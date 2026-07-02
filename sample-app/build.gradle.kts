@@ -32,7 +32,7 @@ android {
 
 dependencies {
     implementation(project(":tantivy-android"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 
     androidTestImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.2.21")
