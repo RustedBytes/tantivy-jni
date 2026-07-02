@@ -142,3 +142,133 @@ fn rejects_oversized_search_limit() {
     assert!(matches!(error, NativeError::Search(_)));
     close_index(handle).unwrap();
 }
+
+#[test]
+fn rejects_unknown_default_search_field() {
+    let dir = tempfile::tempdir().unwrap();
+    let handle = open_index(
+        dir.path().to_str().unwrap(),
+        &schema_json(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap();
+
+    let error = search(
+        handle,
+        &json!({
+            "query": "android",
+            "limit": 10,
+            "offset": 0,
+            "defaultFields": ["missing"]
+        })
+        .to_string(),
+    )
+    .unwrap_err();
+    assert!(matches!(error, NativeError::Search(_)));
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn rejects_sort_on_non_fast_field() {
+    let dir = tempfile::tempdir().unwrap();
+    let handle = open_index(
+        dir.path().to_str().unwrap(),
+        &schema_json(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap();
+
+    let error = search(
+        handle,
+        &json!({
+            "query": "android",
+            "limit": 10,
+            "offset": 0,
+            "sort": { "field": "id", "order": "asc" }
+        })
+        .to_string(),
+    )
+    .unwrap_err();
+    assert!(matches!(error, NativeError::Search(_)));
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn delete_term_removes_document_after_commit_and_refresh() {
+    let dir = tempfile::tempdir().unwrap();
+    let handle = open_index(
+        dir.path().to_str().unwrap(),
+        &schema_json(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap();
+    add_documents(
+        handle,
+        &json!({
+            "documents": [{
+                "fields": {
+                    "title": [{ "type": "text", "value": "delete me" }],
+                    "id": [{ "type": "string", "value": "doc-delete" }]
+                }
+            }]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    commit_and_refresh(handle).unwrap();
+
+    crate::delete_term(
+        handle,
+        "id",
+        &json!({ "type": "string", "value": "doc-delete" }).to_string(),
+    )
+    .unwrap();
+    commit_and_refresh(handle).unwrap();
+
+    let result = search(
+        handle,
+        &json!({ "query": "delete", "limit": 10, "offset": 0 }).to_string(),
+    )
+    .unwrap();
+    let result: JsonValue = serde_json::from_str(&result).unwrap();
+    assert_eq!(result["hits"].as_array().unwrap().len(), 0);
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn rejects_invalid_open_options() {
+    let dir = tempfile::tempdir().unwrap();
+    let error = open_index(
+        dir.path().to_str().unwrap(),
+        &schema_json(),
+        &json!({ "create": true, "writerThreads": 0, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap_err();
+    assert!(matches!(error, NativeError::Open(_)));
+}
+
+#[test]
+fn rejects_wrong_document_field_type() {
+    let dir = tempfile::tempdir().unwrap();
+    let handle = open_index(
+        dir.path().to_str().unwrap(),
+        &schema_json(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap();
+
+    let error = add_documents(
+        handle,
+        &json!({
+            "documents": [{
+                "fields": {
+                    "price": [{ "type": "text", "value": "not a number" }]
+                }
+            }]
+        })
+        .to_string(),
+    )
+    .unwrap_err();
+    assert!(matches!(error, NativeError::Write(_)));
+    close_index(handle).unwrap();
+}
