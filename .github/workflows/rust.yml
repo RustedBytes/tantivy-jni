@@ -1,0 +1,47 @@
+name: Rust
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/rust.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/**"
+  push:
+    paths:
+      - ".github/workflows/rust.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/**"
+
+concurrency:
+  group: rust-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test And Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.86.0
+          components: clippy, rustfmt
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Test
+        run: cargo test
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings

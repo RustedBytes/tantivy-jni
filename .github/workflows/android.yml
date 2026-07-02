@@ -1,0 +1,52 @@
+name: Android Kotlin
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/android.yml"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - "tantivy-android/**"
+  push:
+    paths:
+      - ".github/workflows/android.yml"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - "tantivy-android/**"
+
+concurrency:
+  group: android-kotlin-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set Up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set Up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android Packages
+        run: |
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set Up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.5.1"
+
+      - name: Test
+        run: gradle :tantivy-android:testDebugUnitTest
