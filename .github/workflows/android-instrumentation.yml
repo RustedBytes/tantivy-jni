@@ -88,10 +88,17 @@ jobs:
       - name: Build Consumer Sample With JNI
         run: ./gradlew :sample-app:assembleRelease
 
+      - name: Free Space Before Emulator
+        run: |
+          rm -rf target
+          rm -rf tantivy-android/build sample-app/build
+          df -h
+
       - name: Run Connected Tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 36
           arch: x86_64
           target: google_apis
+          disk-size: 4096M
           script: ./gradlew :tantivy-android:connectedDebugAndroidTest :sample-app:connectedDebugAndroidTest
