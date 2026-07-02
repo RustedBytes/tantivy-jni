@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use tantivy::schema::{
-    BytesOptions, Field, NumericOptions, STRING, Schema, TEXT, TextOptions, DateOptions,
-    JsonObjectOptions, FacetOptions, IpAddrOptions,
+    BytesOptions, DateOptions, FacetOptions, Field, IpAddrOptions, JsonObjectOptions,
+    NumericOptions, STRING, Schema, TEXT, TextOptions,
 };
 
 use crate::model::{BuiltSchema, FieldInfo, FieldKind, FieldRequest, SchemaRequest, TokenizerMode};

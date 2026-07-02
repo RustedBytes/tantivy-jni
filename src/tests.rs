@@ -528,8 +528,14 @@ fn test_ram_directory_date_json_search_options() {
     let result: JsonValue = serde_json::from_str(&result).unwrap();
     let hits = result["hits"].as_array().unwrap();
     assert_eq!(hits.len(), 1);
-    assert_eq!(hits[0]["fields"]["published"][0]["value"].as_i64(), Some(1609459200000i64));
-    assert_eq!(hits[0]["fields"]["metadata"][0]["value"]["tags"][0].as_str(), Some("rust"));
+    assert_eq!(
+        hits[0]["fields"]["published"][0]["value"].as_i64(),
+        Some(1609459200000i64)
+    );
+    assert_eq!(
+        hits[0]["fields"]["metadata"][0]["value"]["tags"][0].as_str(),
+        Some("rust")
+    );
 
     // 2. Check highlighting (snippet fields)
     let highlight_result = search(
@@ -544,7 +550,9 @@ fn test_ram_directory_date_json_search_options() {
     )
     .unwrap();
     let highlight_result: JsonValue = serde_json::from_str(&highlight_result).unwrap();
-    let snippet = highlight_result["hits"][0]["snippets"]["title"].as_str().unwrap();
+    let snippet = highlight_result["hits"][0]["snippets"]["title"]
+        .as_str()
+        .unwrap();
     assert!(snippet.contains("<b>release</b>"));
 
     // 3. Check count only
@@ -564,12 +572,7 @@ fn test_ram_directory_date_json_search_options() {
     assert_eq!(count_result["hits"].as_array().unwrap().len(), 0);
 
     // 4. Test delete by query
-    let delete_op = crate::delete_query(
-        handle,
-        "cool",
-        &json!([]).to_string()
-    )
-    .unwrap();
+    let delete_op = crate::delete_query(handle, "cool", &json!([]).to_string()).unwrap();
     let delete_op: JsonValue = serde_json::from_str(&delete_op).unwrap();
     assert!(delete_op["opstamp"].as_u64().is_some());
     commit_and_refresh(handle).unwrap();

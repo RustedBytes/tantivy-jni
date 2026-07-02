@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use serde_json::{Value as JsonValue, json};
-use tantivy::collector::{TopDocs, Count};
+use std::collections::HashMap;
+use tantivy::collector::{Count, TopDocs};
 use tantivy::index::Order;
 use tantivy::query::QueryParser;
 use tantivy::schema::{Field, TantivyDocument};
@@ -90,10 +90,9 @@ fn execute_search(
 
     let mut snippet_generators = HashMap::new();
     for field_name in &request.snippet_fields {
-        let field = index
-            .fields
-            .get(field_name)
-            .ok_or_else(|| NativeError::Search(format!("unknown snippet field '{}'", field_name)))?;
+        let field = index.fields.get(field_name).ok_or_else(|| {
+            NativeError::Search(format!("unknown snippet field '{}'", field_name))
+        })?;
         let generator = SnippetGenerator::create(&searcher, query.as_ref(), field.field)
             .map_err(|error| NativeError::Search(error.to_string()))?;
         snippet_generators.insert(field_name.clone(), generator);
@@ -130,7 +129,10 @@ fn execute_search(
                 let snippet = generator.snippet_from_doc(&document);
                 snippets.insert(name.clone(), json!(snippet.to_html()));
             }
-            hit_val.as_object_mut().unwrap().insert("snippets".to_string(), JsonValue::Object(snippets));
+            hit_val
+                .as_object_mut()
+                .unwrap()
+                .insert("snippets".to_string(), JsonValue::Object(snippets));
         }
         hits.push(hit_val);
     }
@@ -177,26 +179,44 @@ fn execute_sorted_search(
 
     match field.kind {
         model::FieldKind::I64 => {
-            let (count, docs) = searcher.search(
-                query,
-                &(Count, top_docs(request).order_by_fast_field::<i64>(&sort.field, sort_order(sort.order))),
-            ).map_err(|error| NativeError::Search(error.to_string()))?;
+            let (count, docs) = searcher
+                .search(
+                    query,
+                    &(
+                        Count,
+                        top_docs(request)
+                            .order_by_fast_field::<i64>(&sort.field, sort_order(sort.order)),
+                    ),
+                )
+                .map_err(|error| NativeError::Search(error.to_string()))?;
             let hits = sorted_hits(index, docs, selected_fields, snippet_generators)?;
             Ok((count, hits))
         }
         model::FieldKind::U64 => {
-            let (count, docs) = searcher.search(
-                query,
-                &(Count, top_docs(request).order_by_fast_field::<u64>(&sort.field, sort_order(sort.order))),
-            ).map_err(|error| NativeError::Search(error.to_string()))?;
+            let (count, docs) = searcher
+                .search(
+                    query,
+                    &(
+                        Count,
+                        top_docs(request)
+                            .order_by_fast_field::<u64>(&sort.field, sort_order(sort.order)),
+                    ),
+                )
+                .map_err(|error| NativeError::Search(error.to_string()))?;
             let hits = sorted_hits(index, docs, selected_fields, snippet_generators)?;
             Ok((count, hits))
         }
         model::FieldKind::F64 => {
-            let (count, docs) = searcher.search(
-                query,
-                &(Count, top_docs(request).order_by_fast_field::<f64>(&sort.field, sort_order(sort.order))),
-            ).map_err(|error| NativeError::Search(error.to_string()))?;
+            let (count, docs) = searcher
+                .search(
+                    query,
+                    &(
+                        Count,
+                        top_docs(request)
+                            .order_by_fast_field::<f64>(&sort.field, sort_order(sort.order)),
+                    ),
+                )
+                .map_err(|error| NativeError::Search(error.to_string()))?;
             let hits = sorted_hits(index, docs, selected_fields, snippet_generators)?;
             Ok((count, hits))
         }
@@ -229,7 +249,10 @@ fn sorted_hits<T>(
                 let snippet = generator.snippet_from_doc(&document);
                 snippets.insert(name.clone(), json!(snippet.to_html()));
             }
-            hit_val.as_object_mut().unwrap().insert("snippets".to_string(), JsonValue::Object(snippets));
+            hit_val
+                .as_object_mut()
+                .unwrap()
+                .insert("snippets".to_string(), JsonValue::Object(snippets));
         }
         hits.push(hit_val);
     }

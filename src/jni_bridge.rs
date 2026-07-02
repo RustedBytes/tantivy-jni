@@ -6,8 +6,8 @@ use jni::strings::JNIString;
 use jni::sys::{jlong, jobject};
 
 use crate::{
-    NativeError, NativeResult, add_documents, close_index, commit, commit_and_refresh, delete_all_documents, delete_term,
-    delete_query, open_index, refresh, schema_info, search,
+    NativeError, NativeResult, add_documents, close_index, commit, commit_and_refresh,
+    delete_all_documents, delete_query, delete_term, open_index, refresh, schema_info, search,
 };
 
 const EXCEPTION_PACKAGE: &str = "com/rustedbytes/tantivy";

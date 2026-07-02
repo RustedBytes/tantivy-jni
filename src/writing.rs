@@ -7,22 +7,39 @@ use crate::registry::with_index;
 use crate::validation::MAX_DOCUMENTS_PER_BATCH;
 use crate::{NativeError, NativeResult};
 
-pub(crate) fn delete_query(handle: i64, query_str: &str, default_fields_json: &str) -> NativeResult<String> {
+pub(crate) fn delete_query(
+    handle: i64,
+    query_str: &str,
+    default_fields_json: &str,
+) -> NativeResult<String> {
     let default_fields: Vec<String> = serde_json::from_str(default_fields_json)?;
     with_index(handle, |index| {
-        let fields = if default_fields.is_empty() {
-            index.default_search_fields.clone()
-        } else {
-            default_fields.iter().map(|name| {
-                index.fields.get(name).map(|f| f.field).ok_or_else(|| NativeError::Write(format!("unknown query field {}", name)))
-            }).collect::<NativeResult<Vec<_>>>()?
-        };
+        let fields =
+            if default_fields.is_empty() {
+                index.default_search_fields.clone()
+            } else {
+                default_fields
+                    .iter()
+                    .map(|name| {
+                        index.fields.get(name).map(|f| f.field).ok_or_else(|| {
+                            NativeError::Write(format!("unknown query field {}", name))
+                        })
+                    })
+                    .collect::<NativeResult<Vec<_>>>()?
+            };
         if fields.is_empty() {
-            return Err(NativeError::Write("at least one default search field is required".to_string()));
+            return Err(NativeError::Write(
+                "at least one default search field is required".to_string(),
+            ));
         }
         let query_parser = QueryParser::for_index(&index.index, fields);
-        let query = query_parser.parse_query(query_str).map_err(|error| NativeError::Write(error.to_string()))?;
-        let opstamp = index.writer.delete_query(query).map_err(|error| NativeError::Write(error.to_string()))?;
+        let query = query_parser
+            .parse_query(query_str)
+            .map_err(|error| NativeError::Write(error.to_string()))?;
+        let opstamp = index
+            .writer
+            .delete_query(query)
+            .map_err(|error| NativeError::Write(error.to_string()))?;
         Ok(json!({ "opstamp": opstamp }).to_string())
     })
 }

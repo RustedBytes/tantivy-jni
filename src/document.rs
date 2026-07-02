@@ -2,9 +2,9 @@ use std::net::IpAddr;
 use std::str::FromStr;
 
 use serde_json::{Value as JsonValue, json};
-use tantivy::schema::{Facet, TantivyDocument, Term, Value};
-use tantivy::schema::document::OwnedValue;
 use tantivy::DateTime;
+use tantivy::schema::document::OwnedValue;
+use tantivy::schema::{Facet, TantivyDocument, Term, Value};
 
 use crate::model::{DocumentRequest, FieldInfo, FieldKind, FieldValueRequest, NativeIndex};
 use crate::validation::{MAX_FIELD_VALUES_PER_DOCUMENT, MAX_STORED_BYTES};
@@ -143,9 +143,11 @@ fn json_to_owned_value(val: serde_json::Value) -> OwnedValue {
         serde_json::Value::Array(arr) => {
             OwnedValue::Array(arr.into_iter().map(json_to_owned_value).collect())
         }
-        serde_json::Value::Object(obj) => {
-            OwnedValue::Object(obj.into_iter().map(|(k, v)| (k, json_to_owned_value(v))).collect())
-        }
+        serde_json::Value::Object(obj) => OwnedValue::Object(
+            obj.into_iter()
+                .map(|(k, v)| (k, json_to_owned_value(v)))
+                .collect(),
+        ),
     }
 }
 
@@ -233,13 +235,11 @@ where
         FieldKind::Date => value
             .as_datetime()
             .map(|dt| json!({ "type": "date", "value": dt.into_timestamp_millis() })),
-        FieldKind::Facet => value
-            .as_facet()
-            .and_then(|encoded| {
-                Facet::from_encoded(encoded.as_bytes().to_vec())
-                    .ok()
-                    .map(|facet| json!({ "type": "facet", "value": facet.to_path_string() }))
-            }),
+        FieldKind::Facet => value.as_facet().and_then(|encoded| {
+            Facet::from_encoded(encoded.as_bytes().to_vec())
+                .ok()
+                .map(|facet| json!({ "type": "facet", "value": facet.to_path_string() }))
+        }),
         FieldKind::IpAddr => value
             .as_ip_addr()
             .map(|ip| json!({ "type": "ipaddr", "value": ip.to_string() })),
