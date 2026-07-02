@@ -1,0 +1,6 @@
+/target
+.gradle/
+build/
+**/build/
+local.properties
+tantivy-android/src/main/jniLibs/
