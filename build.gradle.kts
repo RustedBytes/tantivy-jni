@@ -2,8 +2,8 @@ import org.cyclonedx.gradle.CyclonedxAggregateTask
 import org.cyclonedx.gradle.CyclonedxDirectTask
 
 plugins {
-    id("com.android.application") version "9.2.1" apply false
-    id("com.android.library") version "9.2.0" apply false
+    id("com.android.application") version "9.2.0" apply false
+    id("com.android.library") version "9.2.1" apply false
     id("dev.detekt") version "2.0.0-alpha.5" apply false
     id("org.cyclonedx.bom") version "3.2.4"
     id("org.jetbrains.dokka") version "2.2.0" apply false
