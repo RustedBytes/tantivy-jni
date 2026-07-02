@@ -151,7 +151,7 @@ class TantivyIndexTest {
         )
         val index = TantivyIndex.fromNativeHandle(1, IndexOptions(dispatcher = Dispatchers.Default), bridge)
 
-        val addJob = async {
+        val addJob = async(Dispatchers.Default) {
             index.add(IndexDocument.build { text("title", "value") })
         }
 
@@ -379,6 +379,12 @@ private class FakeBridge(
 
     override fun deleteTerm(handle: Long, field: String, valueJson: String): String =
         JSONObject().put("termsDeleted", 1).toString()
+
+    override fun deleteQuery(handle: Long, query: String, defaultFieldsJson: String): String =
+        JSONObject().put("termsDeleted", 1).toString()
+
+    override fun deleteAllDocuments(handle: Long): String =
+        JSONObject().put("opstamp", 1L).toString()
 
     override fun commit(handle: Long): String {
         commitCalls += 1
