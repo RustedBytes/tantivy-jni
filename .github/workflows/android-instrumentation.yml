@@ -92,6 +92,8 @@ jobs:
         run: |
           rm -rf target
           rm -rf tantivy-android/build sample-app/build
+          rm -rf "${ANDROID_NDK_HOME}"
+          rm -rf ~/.cargo/git ~/.cargo/registry ~/.rustup/toolchains
           df -h
 
       - name: Run Connected Tests
