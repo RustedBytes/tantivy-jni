@@ -8,6 +8,9 @@ on:
       - "build.gradle.kts"
       - "settings.gradle.kts"
       - "gradle.properties"
+      - "gradle/wrapper/**"
+      - "gradlew"
+      - "gradlew.bat"
       - "config/detekt/**"
       - "tantivy-android/**"
   push:
@@ -16,6 +19,9 @@ on:
       - "build.gradle.kts"
       - "settings.gradle.kts"
       - "gradle.properties"
+      - "gradle/wrapper/**"
+      - "gradlew"
+      - "gradlew.bat"
       - "config/detekt/**"
       - "tantivy-android/**"
 
@@ -32,6 +38,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate Gradle Wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
       - name: Set Up JDK
         uses: actions/setup-java@v4
         with:
@@ -47,11 +56,18 @@ jobs:
 
       - name: Set Up Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "9.5.1"
 
       - name: Lint
-        run: gradle :tantivy-android:detekt
+        run: ./gradlew :tantivy-android:detekt
+
+      - name: Android Lint
+        run: ./gradlew :tantivy-android:lintRelease
+
+      - name: API Docs
+        run: ./gradlew :tantivy-android:dokkaGenerate
+
+      - name: API Compatibility
+        run: ./gradlew apiCheck
 
       - name: Test
-        run: gradle :tantivy-android:testDebugUnitTest
+        run: ./gradlew :tantivy-android:testDebugUnitTest

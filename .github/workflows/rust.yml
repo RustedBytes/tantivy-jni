@@ -45,3 +45,15 @@ jobs:
 
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
+
+      - name: Install Cargo Audit
+        run: cargo install cargo-audit --locked
+
+      - name: Security Audit
+        run: cargo audit
+
+      - name: Install Cargo Deny
+        run: cargo install cargo-deny --locked
+
+      - name: Dependency Policy
+        run: cargo deny check

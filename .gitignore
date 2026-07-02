@@ -2,5 +2,6 @@
 .gradle/
 build/
 **/build/
+dist/
 local.properties
 tantivy-android/src/main/jniLibs/

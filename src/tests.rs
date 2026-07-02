@@ -272,3 +272,73 @@ fn rejects_wrong_document_field_type() {
     assert!(matches!(error, NativeError::Write(_)));
     close_index(handle).unwrap();
 }
+
+#[test]
+fn rejects_operations_after_close() {
+    let dir = tempfile::tempdir().unwrap();
+    let handle = open_index(
+        dir.path().to_str().unwrap(),
+        &schema_json(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap();
+    close_index(handle).unwrap();
+
+    let error = search(
+        handle,
+        &json!({ "query": "android", "limit": 10, "offset": 0 }).to_string(),
+    )
+    .unwrap_err();
+    assert!(matches!(error, NativeError::InvalidHandle(_)));
+}
+
+#[test]
+fn rejects_double_close() {
+    let dir = tempfile::tempdir().unwrap();
+    let handle = open_index(
+        dir.path().to_str().unwrap(),
+        &schema_json(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap();
+
+    close_index(handle).unwrap();
+    let error = close_index(handle).unwrap_err();
+    assert!(matches!(error, NativeError::InvalidHandle(_)));
+}
+
+#[test]
+fn rejects_malformed_json_contracts() {
+    let dir = tempfile::tempdir().unwrap();
+    let error = open_index(
+        dir.path().to_str().unwrap(),
+        "{not-json",
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap_err();
+    assert!(matches!(error, NativeError::Json(_)));
+
+    let handle = open_index(
+        dir.path().join("valid").to_str().unwrap(),
+        &schema_json(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap();
+    let error = add_documents(handle, "{not-json").unwrap_err();
+    assert!(matches!(error, NativeError::Json(_)));
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn rejects_unknown_schema_default_search_field() {
+    let schema: SchemaRequest = serde_json::from_value(json!({
+        "fields": [
+            { "name": "title", "type": "text", "stored": true, "indexed": true }
+        ],
+        "defaultSearchFields": ["missing"]
+    }))
+    .unwrap();
+
+    let error = build_schema(&schema).unwrap_err();
+    assert!(matches!(error, NativeError::Schema(_)));
+}

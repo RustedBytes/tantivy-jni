@@ -1,0 +1,148 @@
+# Tantivy Android public API
+
+## com/rustedbytes/tantivy/AdvancedTantivyIndex.kt
+- class AdvancedTantivyIndex internal constructor( private val index: TantivyIndex, )
+- suspend fun nativeSearch(request: AdvancedSearchRequest): SearchPage =
+- suspend fun commitAndRefresh(): CommitRefreshResult =
+- suspend fun schemaInfo(): SchemaInfo =
+
+## com/rustedbytes/tantivy/DocumentModels.kt
+- data class IndexDocument(val fields: Map<String, List<FieldValue>>)
+- fun toJsonObject(): JSONObject = JSONObject()
+- fun build(block: Builder.() -> Unit): IndexDocument = Builder().apply(block).build()
+- class Builder
+- fun field(name: String, value: FieldValue)
+- fun text(name: String, value: String) = field(name, FieldValue.Text(value))
+- fun string(name: String, value: String) = field(name, FieldValue.StringValue(value))
+- fun i64(name: String, value: Long) = field(name, FieldValue.I64(value))
+- fun u64(name: String, value: Long) = field(name, FieldValue.U64(value))
+- fun f64(name: String, value: Double) = field(name, FieldValue.F64(value))
+- fun bool(name: String, value: Boolean) = field(name, FieldValue.Bool(value))
+- fun bytes(name: String, value: ByteArray) = field(name, FieldValue.Bytes(value))
+- fun put(name: String, value: FieldValue) = field(name, value)
+- fun putAll(values: Map<String, FieldValue>) = values.forEach { (name, value) -> field(name, value) }
+- fun repeated(name: String, values: Iterable<FieldValue>) = values.forEach { field(name, it) }
+- fun build(): IndexDocument = IndexDocument(fields.mapValues { it.value.toList() })
+
+## com/rustedbytes/tantivy/Exceptions.kt
+- open class TantivyException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
+- class SchemaException(message: String, cause: Throwable? = null) : TantivyException(message, cause)
+- class IndexOpenException(message: String, cause: Throwable? = null) : TantivyException(message, cause)
+- class WriteException(message: String, cause: Throwable? = null) : TantivyException(message, cause)
+- class SearchException(message: String, cause: Throwable? = null) : TantivyException(message, cause)
+- class NativeLibraryException(message: String, cause: Throwable? = null) : TantivyException(message, cause)
+- class TantivyIndexClosedException(message: String = "Tantivy index is closed") : TantivyException(message)
+
+## com/rustedbytes/tantivy/FieldModels.kt
+- enum class FieldType(internal val wireName: String)
+- enum class TokenizerMode(internal val wireName: String)
+- sealed class FieldValue
+- abstract val type: FieldType
+- data class Text(val value: kotlin.String) : FieldValue()
+- data class StringValue(val value: kotlin.String) : FieldValue()
+- data class I64(val value: Long) : FieldValue()
+- data class U64(val value: Long) : FieldValue()
+- data class F64(val value: Double) : FieldValue()
+- data class Bool(val value: Boolean) : FieldValue()
+- class Bytes(value: ByteArray) : FieldValue()
+- fun toByteArray(): ByteArray = bytes.copyOf()
+
+## com/rustedbytes/tantivy/IndexOptions.kt
+- data class IndexOptions( val create: Boolean = true, val writerThreads: Int = 1, val writerMemoryBytes: Int = 50_000_000, val dispatcher: CoroutineDispatcher = Dispatchers.IO, )
+- fun toJson(): String = JSONObject()
+- data class BatchOptions( val maxBatchSize: Int = 500, val commitEveryBatch: Boolean = false, val commitPolicy: CommitPolicy = if (commitEveryBatch) CommitPolicy.EveryBatch else CommitPolicy.Manual, val refreshPolicy: RefreshPolicy = RefreshPolicy.Manual, val errorPolicy: BatchErrorPolicy = BatchErrorPolicy.Stop, val progressGranularity: ProgressGranularity = ProgressGranularity.Batch, )
+- enum class CommitPolicy
+- enum class RefreshPolicy
+- enum class BatchErrorPolicy
+- enum class ProgressGranularity
+
+## com/rustedbytes/tantivy/ResultModels.kt
+- data class WriteResult(val documentsAdded: Int)
+- data class DeleteResult(val termsDeleted: Int)
+- data class CommitResult(val opstamp: Long)
+- data class RefreshResult(val refreshed: Boolean)
+- data class CommitRefreshResult(val opstamp: Long, val refreshed: Boolean)
+- data class SearchPage(val totalHits: Int, val hits: List<SearchHit>)
+- data class SearchHit(val score: Float, val fields: Map<String, List<FieldValue>>)
+- data class SchemaInfo(val fields: List<SchemaField>, val defaultSearchFields: List<String>)
+- interface DocumentMapper<T>
+- fun toDocument(value: T): IndexDocument
+- fun fromHit(hit: SearchHit): T? = null
+- sealed class SearchState
+- data object Loading : SearchState()
+- data class Success(val page: SearchPage) : SearchState()
+- data object Empty : SearchState()
+- data class Error(val error: TantivyException) : SearchState()
+- sealed class IndexState
+- data object Opening : IndexState()
+- data object Open : IndexState()
+- data object Committing : IndexState()
+- data object Refreshing : IndexState()
+- data object Closed : IndexState()
+- data class Error(val error: TantivyException) : IndexState()
+- sealed class IndexingProgress
+- data class Batch(val documentsIndexed: Int, val totalIndexed: Int) : IndexingProgress()
+- data class Complete(val totalIndexed: Int) : IndexingProgress()
+
+## com/rustedbytes/tantivy/SchemaModels.kt
+- data class SchemaField( val name: String, val type: FieldType, val stored: Boolean = true, val indexed: Boolean = true, val fast: Boolean = false, val tokenizer: TokenizerMode? = null, val experimental: Boolean = false, )
+- class IndexSchema private constructor( val fields: List<SchemaField>, val defaultSearchFields: List<String>, )
+- fun toJson(): String = JSONObject()
+- fun build(block: Builder.() -> Unit): IndexSchema = Builder().apply(block).build()
+- class Builder
+- fun text( name: String, stored: Boolean = true, indexed: Boolean = true, defaultSearch: Boolean = true, tokenizer: TokenizerMode = TokenizerMode.Default, )
+- fun string( name: String, stored: Boolean = true, indexed: Boolean = true, defaultSearch: Boolean = false, tokenizer: TokenizerMode = TokenizerMode.Raw, )
+- fun i64(name: String, stored: Boolean = true, indexed: Boolean = true, fast: Boolean = false) =
+- fun u64(name: String, stored: Boolean = true, indexed: Boolean = true, fast: Boolean = false) =
+- fun f64(name: String, stored: Boolean = true, indexed: Boolean = true, fast: Boolean = false) =
+- fun bool(name: String, stored: Boolean = true, indexed: Boolean = true, fast: Boolean = false) =
+- fun bytes(name: String, stored: Boolean = true, indexed: Boolean = true, fast: Boolean = false) =
+- fun field( name: String, type: FieldType, stored: Boolean = true, indexed: Boolean = true, fast: Boolean = false, tokenizer: TokenizerMode? = null, experimental: Boolean = false, )
+- fun defaultSearchFields(vararg names: String)
+- fun build(): IndexSchema = IndexSchema(fields.toList(), defaultSearchFields.distinct())
+
+## com/rustedbytes/tantivy/SearchModels.kt
+- data class SearchFlowOptions( val debounceMillis: Long = 250, val distinctUntilChanged: Boolean = true, val emitLoading: Boolean = true, )
+- enum class SortOrder(internal val wireName: String)
+- data class SortRequest( val field: String, val order: SortOrder = SortOrder.Desc, )
+- fun toJsonObject(): JSONObject = JSONObject()
+- data class SearchRequest( val query: String, val limit: Int = 20, val offset: Int = 0, val defaultFields: List<String> = emptyList(), val selectedFields: List<String> = emptyList(), val sort: SortRequest? = null, val reloadBeforeSearch: Boolean = false, val flowOptions: SearchFlowOptions = SearchFlowOptions(), )
+- fun toJson(): String = JSONObject()
+- typealias SearchQuery = SearchRequest
+- data class AdvancedSearchRequest( val request: SearchRequest, )
+
+## com/rustedbytes/tantivy/TantivyClient.kt
+- object TantivyClient
+- suspend fun open( path: String, schema: IndexSchema, options: IndexOptions = IndexOptions(), ): TantivyIndex = TantivyIndex.open(path, schema, options)
+- fun schema(block: IndexSchema.Builder.() -> Unit): IndexSchema = IndexSchema.build(block)
+- fun document(block: IndexDocument.Builder.() -> Unit): IndexDocument = IndexDocument.build(block)
+- fun query(block: SearchRequestBuilder.() -> Unit): SearchRequest =
+- class SearchRequestBuilder
+- var query: String = ""
+- var limit: Int = 20
+- var offset: Int = 0
+- var reloadBeforeSearch: Boolean = false
+- var flowOptions: SearchFlowOptions = SearchFlowOptions()
+- fun defaultFields(vararg names: String)
+- fun selectedFields(vararg names: String)
+- fun sortBy(field: String, order: SortOrder = SortOrder.Desc)
+- fun build(): SearchRequest = SearchRequest( query = query, limit = limit, offset = offset, defaultFields = defaultFields.distinct(), selectedFields = selectedFields.distinct(), sort = sort, reloadBeforeSearch = reloadBeforeSearch, flowOptions = flowOptions, )
+- annotation class AdvancedTantivyApi
+
+## com/rustedbytes/tantivy/TantivyIndex.kt
+- class TantivyIndex internal constructor( handle: Long, private val options: IndexOptions, private val bridge: NativeBridge, ) : AutoCloseable
+- val advanced: AdvancedTantivyIndex = AdvancedTantivyIndex(this)
+- fun observeIndexState(): StateFlow<IndexState> = state
+- suspend fun add(document: IndexDocument): WriteResult = addAll(listOf(document))
+- suspend fun addAll(documents: List<IndexDocument>): WriteResult
+- suspend fun delete(field: String, value: FieldValue): DeleteResult =
+- suspend fun commit(): CommitResult
+- suspend fun refresh(): RefreshResult
+- suspend fun commitAndRefresh(): CommitRefreshResult
+- suspend fun schemaInfo(): SchemaInfo =
+- suspend fun search(query: SearchRequest): SearchPage =
+- fun searchFlow(query: Flow<SearchRequest>): Flow<SearchState>
+- fun indexDocuments( documents: Flow<IndexDocument>, options: BatchOptions = BatchOptions(), ): Flow<IndexingProgress> = flow
+- fun launchIndexing( scope: CoroutineScope, documents: Flow<IndexDocument>, options: BatchOptions = BatchOptions(), ): Job = scope.launch
+- suspend fun closeSuspending()
+- suspend fun open( path: String, schema: IndexSchema, options: IndexOptions = IndexOptions(), ): TantivyIndex

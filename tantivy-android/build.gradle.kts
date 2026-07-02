@@ -1,6 +1,9 @@
 plugins {
     id("com.android.library")
     id("dev.detekt")
+    id("maven-publish")
+    id("org.jetbrains.dokka")
+    id("signing")
 }
 
 android {
@@ -10,8 +13,15 @@ android {
     defaultConfig {
         minSdk = 23
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles("consumer-rules.pro")
         ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64")
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+        }
+    }
+
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
         }
     }
 }
@@ -41,4 +51,75 @@ detekt {
             "src/androidTest/kotlin",
         ),
     )
+}
+
+publishing {
+    publications {
+        register<MavenPublication>("release") {
+            groupId = providers.gradleProperty("GROUP").get()
+            artifactId = providers.gradleProperty("POM_ARTIFACT_ID").get()
+            version = providers.gradleProperty("VERSION_NAME").get()
+
+            afterEvaluate {
+                from(components["release"])
+            }
+
+            pom {
+                name.set(providers.gradleProperty("POM_NAME"))
+                description.set(providers.gradleProperty("POM_DESCRIPTION"))
+                url.set(providers.gradleProperty("POM_URL"))
+                licenses {
+                    license {
+                        name.set("Apache License 2.0")
+                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                    }
+                }
+                developers {
+                    developer {
+                        id.set("rustedbytes")
+                        name.set("Rusted Bytes")
+                    }
+                }
+                scm {
+                    connection.set("scm:git:https://github.com/rustedbytes/tantivy-jni.git")
+                    developerConnection.set("scm:git:ssh://git@github.com/rustedbytes/tantivy-jni.git")
+                    url.set("https://github.com/rustedbytes/tantivy-jni")
+                }
+            }
+        }
+    }
+
+    repositories {
+        maven {
+            name = "release"
+            url = uri(layout.buildDirectory.dir("repository").get().asFile)
+        }
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/${System.getenv("GITHUB_REPOSITORY") ?: "rustedbytes/tantivy-jni"}")
+            credentials {
+                username = providers.gradleProperty("gpr.user")
+                    .orElse(providers.environmentVariable("GITHUB_ACTOR"))
+                    .orNull
+                password = providers.gradleProperty("gpr.key")
+                    .orElse(providers.environmentVariable("GITHUB_TOKEN"))
+                    .orNull
+            }
+        }
+    }
+}
+
+signing {
+    val signingKey = providers.gradleProperty("SIGNING_KEY")
+        .orElse(providers.environmentVariable("SIGNING_KEY"))
+    val signingPassword = providers.gradleProperty("SIGNING_PASSWORD")
+        .orElse(providers.environmentVariable("SIGNING_PASSWORD"))
+    val shouldSign = signingKey.isPresent && signingPassword.isPresent
+
+    setRequired { shouldSign && gradle.taskGraph.allTasks.any { it.name.contains("ReleasePublication") } }
+
+    if (shouldSign) {
+        useInMemoryPgpKeys(signingKey.get(), signingPassword.get())
+        sign(publishing.publications["release"])
+    }
 }

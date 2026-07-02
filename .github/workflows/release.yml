@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -15,6 +16,7 @@ concurrency:
 
 env:
   ANDROID_NDK_VERSION: "27.2.12479018"
+  ANDROID_ABIS: "arm64-v8a armeabi-v7a x86 x86_64"
 
 jobs:
   android-jni:
@@ -25,6 +27,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate Gradle Wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
       - name: Set Up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -33,30 +38,99 @@ jobs:
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
 
+      - name: Set Up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: Set Up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android NDK
+      - name: Install Android Packages
         run: |
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
           sdkmanager "ndk;${ANDROID_NDK_VERSION}"
           echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/${ANDROID_NDK_VERSION}" >> "${GITHUB_ENV}"
 
+      - name: Set Up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Rust Test
+        run: cargo test
+
+      - name: Rust Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Kotlin Static Checks
+        run: ./gradlew :tantivy-android:detekt apiCheck
+
       - name: Build JNI Libraries
         run: scripts/build-android-native.sh
+
+      - name: Verify JNI Libraries
+        run: scripts/verify-android-native.sh
+
+      - name: Build Android AAR
+        run: |
+          RELEASE_VERSION="${GITHUB_REF_NAME#v}"
+          ./gradlew \
+            -PVERSION_NAME="${RELEASE_VERSION}" \
+            :tantivy-android:assembleRelease \
+            :tantivy-android:publishReleasePublicationToReleaseRepository
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+
+      - name: Publish To GitHub Packages
+        run: |
+          RELEASE_VERSION="${GITHUB_REF_NAME#v}"
+          ./gradlew \
+            -PVERSION_NAME="${RELEASE_VERSION}" \
+            :tantivy-android:publishReleasePublicationToGitHubPackagesRepository
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+
+      - name: Verify Release Artifacts
+        run: |
+          set -euo pipefail
+          test -s tantivy-android/build/outputs/aar/tantivy-android-release.aar
+          for abi in $ANDROID_ABIS; do
+            test -s "tantivy-android/src/main/jniLibs/$abi/libtantivy_jni.so"
+            unzip -l tantivy-android/build/outputs/aar/tantivy-android-release.aar \
+              | grep "jni/$abi/libtantivy_jni.so"
+          done
 
       - name: Package JNI Libraries
         run: |
           set -euo pipefail
           RELEASE_TAG_NAME="${GITHUB_REF_NAME//\//-}"
           mkdir -p dist
+          cp tantivy-android/build/outputs/aar/tantivy-android-release.aar \
+            "dist/tantivy-android-${RELEASE_TAG_NAME}.aar"
+          tar -czf "dist/tantivy-android-${RELEASE_TAG_NAME}-maven-repository.tar.gz" \
+            -C tantivy-android/build repository
           tar -czf "dist/tantivy-jni-${RELEASE_TAG_NAME}-android-jni.tar.gz" \
             -C tantivy-android/src/main jniLibs
           zip -r "dist/tantivy-jni-${RELEASE_TAG_NAME}-android-jni.zip" \
             tantivy-android/src/main/jniLibs
-          cp tantivy-android/src/main/jniLibs/arm64-v8a/libtantivy_jni.so \
-            "dist/libtantivy_jni-${RELEASE_TAG_NAME}-arm64-v8a.so"
-          cp tantivy-android/src/main/jniLibs/x86_64/libtantivy_jni.so \
-            "dist/libtantivy_jni-${RELEASE_TAG_NAME}-x86_64.so"
+          for abi in $ANDROID_ABIS; do
+            cp "tantivy-android/src/main/jniLibs/$abi/libtantivy_jni.so" \
+              "dist/libtantivy_jni-${RELEASE_TAG_NAME}-${abi}.so"
+          done
+
+      - name: Generate Release Metadata
+        run: |
+          RELEASE_TAG_NAME="${GITHUB_REF_NAME//\//-}" \
+          RELEASE_VERSION="${GITHUB_REF_NAME#v}" \
+          scripts/generate-release-metadata.sh
+
+      - name: Generate Checksums
+        run: |
+          RELEASE_TAG_NAME="${GITHUB_REF_NAME//\//-}"
           sha256sum dist/* > "dist/checksums-${RELEASE_TAG_NAME}.txt"
 
       - name: Upload Build Artifact
