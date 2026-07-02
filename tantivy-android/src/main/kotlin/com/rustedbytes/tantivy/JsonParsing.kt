@@ -70,9 +70,16 @@ internal fun parseSearchPage(json: String): SearchPage {
         totalHits = objectJson.getInt("totalHits"),
         hits = (0 until hitsJson.length()).map { index ->
             val hit = hitsJson.getJSONObject(index)
+            val snippetsJson = hit.optJSONObject("snippets")
+            val snippets = if (snippetsJson != null) {
+                snippetsJson.keys().asSequence().associateWith { snippetsJson.getString(it) }
+            } else {
+                emptyMap()
+            }
             SearchHit(
                 score = hit.getDouble("score").toFloat(),
                 fields = parseFields(hit.getJSONObject("fields")),
+                snippets = snippets,
             )
         },
     )
@@ -93,6 +100,8 @@ private fun parseFieldValue(valueJson: JSONObject): FieldValue =
         FieldType.F64.wireName -> FieldValue.F64(valueJson.getDouble("value"))
         FieldType.Bool.wireName -> FieldValue.Bool(valueJson.getBoolean("value"))
         FieldType.Bytes.wireName -> FieldValue.Bytes(parseBytes(valueJson.getJSONArray("value")))
+        FieldType.Date.wireName -> FieldValue.Date(java.time.Instant.ofEpochMilli(valueJson.getLong("value")))
+        FieldType.Json.wireName -> FieldValue.Json(valueJson.getJSONObject("value"))
         else -> throw NativeLibraryException("Unknown field value type: ${valueJson.getString("type")}")
     }
 

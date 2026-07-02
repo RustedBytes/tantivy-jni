@@ -1,5 +1,7 @@
 use serde_json::{Value as JsonValue, json};
 use tantivy::schema::{TantivyDocument, Term, Value};
+use tantivy::schema::document::OwnedValue;
+use tantivy::DateTime;
 
 use crate::model::{DocumentRequest, FieldInfo, FieldKind, FieldValueRequest, NativeIndex};
 use crate::validation::{MAX_FIELD_VALUES_PER_DOCUMENT, MAX_STORED_BYTES};
@@ -63,6 +65,14 @@ pub(crate) fn term_for_value(
             field.field,
             &json_bytes(value.value)?,
         )),
+        FieldKind::Date => {
+            let millis = json_i64(value.value, "date millis")?;
+            let dt = DateTime::from_timestamp_millis(millis);
+            Ok(Term::from_field_date(field.field, dt))
+        }
+        FieldKind::Json => Err(NativeError::Write(format!(
+            "term search/delete is not supported directly on json field '{field_name}'"
+        ))),
     }
 }
 
@@ -95,6 +105,31 @@ pub(crate) fn document_to_json(
     JsonValue::Object(fields)
 }
 
+fn json_to_owned_value(val: serde_json::Value) -> OwnedValue {
+    match val {
+        serde_json::Value::Null => OwnedValue::Null,
+        serde_json::Value::Bool(b) => OwnedValue::Bool(b),
+        serde_json::Value::Number(num) => {
+            if let Some(i) = num.as_i64() {
+                OwnedValue::I64(i)
+            } else if let Some(u) = num.as_u64() {
+                OwnedValue::U64(u)
+            } else if let Some(f) = num.as_f64() {
+                OwnedValue::F64(f)
+            } else {
+                OwnedValue::Null
+            }
+        }
+        serde_json::Value::String(s) => OwnedValue::Str(s),
+        serde_json::Value::Array(arr) => {
+            OwnedValue::Array(arr.into_iter().map(json_to_owned_value).collect())
+        }
+        serde_json::Value::Object(obj) => {
+            OwnedValue::Object(obj.into_iter().map(|(k, v)| (k, json_to_owned_value(v))).collect())
+        }
+    }
+}
+
 fn add_value(
     document: &mut TantivyDocument,
     field: FieldInfo,
@@ -109,6 +144,14 @@ fn add_value(
         FieldKind::F64 => document.add_f64(field.field, json_f64(value.value, "f64 value")?),
         FieldKind::Bool => document.add_bool(field.field, json_bool(value.value, "bool value")?),
         FieldKind::Bytes => document.add_bytes(field.field, &json_bytes(value.value)?),
+        FieldKind::Date => {
+            let millis = json_i64(value.value, "date millis")?;
+            document.add_date(field.field, DateTime::from_timestamp_millis(millis));
+        }
+        FieldKind::Json => {
+            let owned = json_to_owned_value(value.value);
+            document.add_field_value(field.field, &owned);
+        }
     }
     Ok(())
 }
@@ -152,6 +195,14 @@ where
                 "value": bytes.iter().map(|byte| *byte as u64).collect::<Vec<_>>()
             })
         }),
+        FieldKind::Date => value
+            .as_datetime()
+            .map(|dt| json!({ "type": "date", "value": dt.into_timestamp_millis() })),
+        FieldKind::Json => {
+            let owned = OwnedValue::from(value.as_value());
+            let json_val = serde_json::to_value(&owned).unwrap_or(JsonValue::Null);
+            Some(json!({ "type": "json", "value": json_val }))
+        }
     }
 }
 

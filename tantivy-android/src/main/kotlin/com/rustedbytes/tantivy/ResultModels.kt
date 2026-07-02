@@ -6,7 +6,7 @@ data class CommitResult(val opstamp: Long)
 data class RefreshResult(val refreshed: Boolean)
 data class CommitRefreshResult(val opstamp: Long, val refreshed: Boolean)
 data class SearchPage(val totalHits: Int, val hits: List<SearchHit>)
-data class SearchHit(val score: Float, val fields: Map<String, List<FieldValue>>)
+data class SearchHit(val score: Float, val fields: Map<String, List<FieldValue>>, val snippets: Map<String, String> = emptyMap())
 data class SchemaInfo(val fields: List<SchemaField>, val defaultSearchFields: List<String>)
 
 interface DocumentMapper<T> {

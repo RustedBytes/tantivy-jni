@@ -15,6 +15,8 @@ pub(crate) enum FieldKind {
     F64,
     Bool,
     Bytes,
+    Date,
+    Json,
 }
 
 #[derive(Debug, Deserialize)]
@@ -90,6 +92,10 @@ pub(crate) struct SearchRequest {
     pub(crate) sort: Option<SortRequest>,
     #[serde(default, rename = "reloadBeforeSearch")]
     pub(crate) reload_before_search: bool,
+    #[serde(default, rename = "countOnly")]
+    pub(crate) count_only: bool,
+    #[serde(default, rename = "snippetFields")]
+    pub(crate) snippet_fields: Vec<String>,
 }
 
 pub(crate) struct NativeIndex {

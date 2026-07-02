@@ -11,10 +11,13 @@ pub(crate) fn open_index(path: &str, schema_json: &str, options_json: &str) -> N
     validate_open_options(&options)?;
 
     let built_schema = schema::build_schema(&schema_request)?;
-    let path = Path::new(path);
-    std::fs::create_dir_all(path).map_err(|error| NativeError::Open(error.to_string()))?;
-
-    let index = open_or_create_tantivy_index(path, options.create, &built_schema.schema)?;
+    let index = if path == ":memory:" {
+        Index::create_in_ram(built_schema.schema.clone())
+    } else {
+        let path = Path::new(path);
+        std::fs::create_dir_all(path).map_err(|error| NativeError::Open(error.to_string()))?;
+        open_or_create_tantivy_index(path, options.create, &built_schema.schema)?
+    };
     let writer = index
         .writer_with_num_threads(options.writer_threads, options.writer_memory_bytes)
         .map_err(|error| NativeError::Open(error.to_string()))?;

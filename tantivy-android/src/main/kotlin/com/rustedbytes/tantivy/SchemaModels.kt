@@ -89,6 +89,12 @@ class IndexSchema private constructor(
         fun bytes(name: String, stored: Boolean = true, indexed: Boolean = true, fast: Boolean = false) =
             field(name, FieldType.Bytes, stored, indexed, fast)
 
+        fun date(name: String, stored: Boolean = true, indexed: Boolean = true, fast: Boolean = false) =
+            field(name, FieldType.Date, stored, indexed, fast)
+
+        fun json(name: String, stored: Boolean = true, indexed: Boolean = true, fast: Boolean = false) =
+            field(name, FieldType.Json, stored, indexed, fast)
+
         fun field(
             name: String,
             type: FieldType,

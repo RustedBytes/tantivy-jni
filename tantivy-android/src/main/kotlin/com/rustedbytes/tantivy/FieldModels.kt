@@ -10,6 +10,8 @@ enum class FieldType(internal val wireName: String) {
     F64("f64"),
     Bool("bool"),
     Bytes("bytes"),
+    Date("date"),
+    Json("json"),
     ;
 
     companion object {
@@ -69,5 +71,25 @@ sealed class FieldValue {
         override fun rawJsonValue(): Any = JSONArray(bytes.map { it.toUByte().toInt() })
 
         fun toByteArray(): ByteArray = bytes.copyOf()
+
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is Bytes) return false
+            return bytes.contentEquals(other.bytes)
+        }
+
+        override fun hashCode(): Int {
+            return bytes.contentHashCode()
+        }
+    }
+
+    data class Date(val value: java.time.Instant) : FieldValue() {
+        override val type = FieldType.Date
+        override fun rawJsonValue(): Any = value.toEpochMilli()
+    }
+
+    data class Json(val value: org.json.JSONObject) : FieldValue() {
+        override val type = FieldType.Json
+        override fun rawJsonValue(): Any = value
     }
 }

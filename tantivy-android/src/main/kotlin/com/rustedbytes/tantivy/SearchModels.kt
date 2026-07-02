@@ -34,6 +34,8 @@ data class SearchRequest(
     val selectedFields: List<String> = emptyList(),
     val sort: SortRequest? = null,
     val reloadBeforeSearch: Boolean = false,
+    val countOnly: Boolean = false,
+    val snippetFields: List<String> = emptyList(),
     val flowOptions: SearchFlowOptions = SearchFlowOptions(),
 ) {
     init {
@@ -50,6 +52,8 @@ data class SearchRequest(
         .put("defaultFields", JSONArray(defaultFields))
         .put("selectedFields", JSONArray(selectedFields))
         .put("reloadBeforeSearch", reloadBeforeSearch)
+        .put("countOnly", countOnly)
+        .put("snippetFields", JSONArray(snippetFields))
         .also { json -> sort?.let { json.put("sort", it.toJsonObject()) } }
         .toString()
 }

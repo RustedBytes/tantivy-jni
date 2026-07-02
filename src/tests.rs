@@ -479,3 +479,114 @@ fn indexing_search_smoke_benchmark() {
     eprintln!("sorted search took {search_elapsed:?}");
     close_index(handle).unwrap();
 }
+
+#[test]
+fn test_ram_directory_date_json_search_options() {
+    let schema = json!({
+        "fields": [
+            { "name": "title", "type": "text", "stored": true, "indexed": true },
+            { "name": "published", "type": "date", "stored": true, "indexed": true, "fast": true },
+            { "name": "metadata", "type": "json", "stored": true, "indexed": true }
+        ],
+        "defaultSearchFields": ["title"]
+    })
+    .to_string();
+
+    let handle = open_index(
+        ":memory:",
+        &schema,
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap();
+
+    let doc_json = json!({
+        "documents": [{
+            "fields": {
+                "title": [{ "type": "text", "value": "Tantivy JNI release is cool" }],
+                "published": [{ "type": "date", "value": 1609459200000i64 }],
+                "metadata": [{ "type": "json", "value": { "tags": ["rust", "jni"], "rating": 5 } }]
+            }
+        }]
+    })
+    .to_string();
+
+    add_documents(handle, &doc_json).unwrap();
+    commit_and_refresh(handle).unwrap();
+
+    // 1. Check basic retrieval of new types
+    let result = search(
+        handle,
+        &json!({
+            "query": "JNI",
+            "limit": 10,
+            "offset": 0
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let result: JsonValue = serde_json::from_str(&result).unwrap();
+    let hits = result["hits"].as_array().unwrap();
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0]["fields"]["published"][0]["value"].as_i64(), Some(1609459200000i64));
+    assert_eq!(hits[0]["fields"]["metadata"][0]["value"]["tags"][0].as_str(), Some("rust"));
+
+    // 2. Check highlighting (snippet fields)
+    let highlight_result = search(
+        handle,
+        &json!({
+            "query": "release",
+            "limit": 10,
+            "offset": 0,
+            "snippetFields": ["title"]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let highlight_result: JsonValue = serde_json::from_str(&highlight_result).unwrap();
+    let snippet = highlight_result["hits"][0]["snippets"]["title"].as_str().unwrap();
+    assert!(snippet.contains("<b>release</b>"));
+
+    // 3. Check count only
+    let count_result = search(
+        handle,
+        &json!({
+            "query": "cool",
+            "limit": 10,
+            "offset": 0,
+            "countOnly": true
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let count_result: JsonValue = serde_json::from_str(&count_result).unwrap();
+    assert_eq!(count_result["totalHits"].as_i64(), Some(1));
+    assert_eq!(count_result["hits"].as_array().unwrap().len(), 0);
+
+    // 4. Test delete by query
+    let delete_op = crate::delete_query(
+        handle,
+        "cool",
+        &json!([]).to_string()
+    )
+    .unwrap();
+    let delete_op: JsonValue = serde_json::from_str(&delete_op).unwrap();
+    assert!(delete_op["opstamp"].as_u64().is_some());
+    commit_and_refresh(handle).unwrap();
+
+    let after_delete = search(
+        handle,
+        &json!({
+            "query": "cool",
+            "limit": 10,
+            "offset": 0,
+            "countOnly": true
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let after_delete: JsonValue = serde_json::from_str(&after_delete).unwrap();
+    assert_eq!(after_delete["totalHits"].as_i64(), Some(0));
+
+    close_index(handle).unwrap();
+}

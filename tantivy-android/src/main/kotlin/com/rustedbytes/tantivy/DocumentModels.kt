@@ -44,6 +44,8 @@ data class IndexDocument(val fields: Map<String, List<FieldValue>>) {
         fun f64(name: String, value: Double) = field(name, FieldValue.F64(value))
         fun bool(name: String, value: Boolean) = field(name, FieldValue.Bool(value))
         fun bytes(name: String, value: ByteArray) = field(name, FieldValue.Bytes(value))
+        fun date(name: String, value: java.time.Instant) = field(name, FieldValue.Date(value))
+        fun json(name: String, value: org.json.JSONObject) = field(name, FieldValue.Json(value))
         fun put(name: String, value: FieldValue) = field(name, value)
         fun putAll(values: Map<String, FieldValue>) = values.forEach { (name, value) -> field(name, value) }
         fun repeated(name: String, values: Iterable<FieldValue>) = values.forEach { field(name, it) }

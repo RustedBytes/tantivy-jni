@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use tantivy::schema::{BytesOptions, Field, NumericOptions, STRING, Schema, TEXT, TextOptions};
+use tantivy::schema::{BytesOptions, Field, NumericOptions, STRING, Schema, TEXT, TextOptions, DateOptions, JsonObjectOptions};
 
 use crate::model::{BuiltSchema, FieldInfo, FieldKind, FieldRequest, SchemaRequest, TokenizerMode};
 use crate::{NativeError, NativeResult};
@@ -27,6 +27,8 @@ pub(crate) fn build_schema(request: &SchemaRequest) -> NativeResult<BuiltSchema>
             FieldKind::F64 => builder.add_f64_field(&field.name, numeric_options(field)),
             FieldKind::Bool => builder.add_bool_field(&field.name, numeric_options(field)),
             FieldKind::Bytes => builder.add_bytes_field(&field.name, bytes_options(field)),
+            FieldKind::Date => builder.add_date_field(&field.name, date_options(field)),
+            FieldKind::Json => builder.add_json_field(&field.name, json_options(field)),
         };
 
         fields.insert(
@@ -136,6 +138,34 @@ fn bytes_options(field: &FieldRequest) -> BytesOptions {
     }
     if field.fast {
         options = options.set_fast();
+    }
+    options
+}
+
+fn date_options(field: &FieldRequest) -> DateOptions {
+    let mut options = DateOptions::default();
+    if field.indexed {
+        options = options.set_indexed();
+    }
+    if field.stored {
+        options = options.set_stored();
+    }
+    if field.fast {
+        options = options.set_fast();
+    }
+    options
+}
+
+fn json_options(field: &FieldRequest) -> JsonObjectOptions {
+    let mut options = JsonObjectOptions::default();
+    if field.indexed {
+        options = options.set_indexing_options(tantivy::schema::TextFieldIndexing::default());
+    }
+    if field.stored {
+        options = options.set_stored();
+    }
+    if field.fast {
+        options = options.set_fast(None);
     }
     options
 }

@@ -7,7 +7,7 @@ use jni::sys::{jlong, jobject};
 
 use crate::{
     NativeError, NativeResult, add_documents, close_index, commit, commit_and_refresh, delete_term,
-    open_index, refresh, schema_info, search,
+    delete_query, open_index, refresh, schema_info, search,
 };
 
 const EXCEPTION_PACKAGE: &str = "com/rustedbytes/tantivy";
@@ -177,4 +177,17 @@ pub extern "system" fn Java_com_rustedbytes_tantivy_NativeTantivy_nativeSearch<'
 ) -> jobject {
     let query_json = read_string(query_json);
     jni_string(env, || search(handle, &query_json))
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_rustedbytes_tantivy_NativeTantivy_nativeDeleteQuery<'caller>(
+    env: EnvUnowned<'caller>,
+    _class: JClass<'caller>,
+    handle: jlong,
+    query: JString<'caller>,
+    default_fields_json: JString<'caller>,
+) -> jobject {
+    let query = read_string(query);
+    let default_fields_json = read_string(default_fields_json);
+    jni_string(env, || delete_query(handle, &query, &default_fields_json))
 }
