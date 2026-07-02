@@ -8,6 +8,7 @@ on:
       - "build.gradle.kts"
       - "settings.gradle.kts"
       - "gradle.properties"
+      - "config/detekt/**"
       - "tantivy-android/**"
   push:
     paths:
@@ -15,6 +16,7 @@ on:
       - "build.gradle.kts"
       - "settings.gradle.kts"
       - "gradle.properties"
+      - "config/detekt/**"
       - "tantivy-android/**"
 
 concurrency:
@@ -47,6 +49,9 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.5.1"
+
+      - name: Lint
+        run: gradle :tantivy-android:detekt
 
       - name: Test
         run: gradle :tantivy-android:testDebugUnitTest

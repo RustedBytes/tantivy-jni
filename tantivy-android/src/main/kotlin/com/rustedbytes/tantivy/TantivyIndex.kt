@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+@Suppress("SwallowedException", "TooGenericExceptionCaught")
 class TantivyIndex internal constructor(
     handle: Long,
     private val options: IndexOptions,
@@ -102,6 +104,8 @@ class TantivyIndex internal constructor(
                 try {
                     val page = search(searchQuery)
                     emit(if (page.hits.isEmpty()) SearchState.Empty else SearchState.Success(page))
+                } catch (error: CancellationException) {
+                    throw error
                 } catch (error: Throwable) {
                     emit(SearchState.Error(error.toTantivyException()))
                 }
@@ -169,6 +173,9 @@ class TantivyIndex internal constructor(
                 bridge.closeIndex(handle)
             }
             state.value = IndexState.Closed
+        } catch (error: CancellationException) {
+            nativeHandle.compareAndSet(0, handle)
+            throw error
         } catch (error: Throwable) {
             nativeHandle.compareAndSet(0, handle)
             throw error.toTantivyException()
@@ -193,6 +200,8 @@ class TantivyIndex internal constructor(
         return try {
             withContext(options.dispatcher) { block(handle) }
                 .also { currentCoroutineContext().ensureActive() }
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: Throwable) {
             val tantivyError = error.toTantivyException()
             if (stateOnError) state.value = IndexState.Error(tantivyError)
@@ -212,16 +221,14 @@ class TantivyIndex internal constructor(
             schema: IndexSchema,
             options: IndexOptions = IndexOptions(),
         ): TantivyIndex {
-            val state = MutableStateFlow<IndexState>(IndexState.Opening)
             return try {
                 val handle = withContext(options.dispatcher) {
                     JniNativeBridge.openIndex(path, schema.toJson(), options.toJson())
                 }
-                TantivyIndex(handle, options, JniNativeBridge).also {
-                    state.value = IndexState.Open
-                }
+                TantivyIndex(handle, options, JniNativeBridge)
+            } catch (error: CancellationException) {
+                throw error
             } catch (error: Throwable) {
-                state.value = IndexState.Error(error.toTantivyException())
                 throw error.toTantivyException()
             }
         }

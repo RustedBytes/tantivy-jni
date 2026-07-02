@@ -280,7 +280,7 @@ class TantivyIndexTest {
         )
         advanceUntilIdle()
 
-        assertEquals(listOf(SearchState.Empty), states)
+        assertEquals(listOf<SearchState>(SearchState.Empty), states)
         job.cancel()
     }
 

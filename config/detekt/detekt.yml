@@ -1,0 +1,39 @@
+config:
+  validation: true
+  warningsAsErrors: false
+
+complexity:
+  LongMethod:
+    active: true
+    allowedLines: 60
+  LongParameterList:
+    active: true
+    allowedFunctionParameters: 8
+    allowedConstructorParameters: 8
+    ignoreDefaultParameters: true
+  TooManyFunctions:
+    active: true
+    allowedFunctionsPerClass: 20
+    allowedFunctionsPerFile: 20
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: true
+    exceptionNames:
+      - Error
+      - Throwable
+      - Exception
+      - RuntimeException
+
+style:
+  MaxLineLength:
+    active: true
+    maxLineLength: 140
+    excludeCommentStatements: true
+  MagicNumber:
+    active: false
+  ReturnCount:
+    active: true
+    max: 3
+    excludedFunctions:
+      - equals
