@@ -34,7 +34,7 @@ dependencies {
     testImplementation("org.json:json:20250517")
 
     androidTestImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.2.21")
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 }
