@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/android-instrumentation.yml"
+      - "sample-app/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "src/**"
@@ -19,6 +20,7 @@ on:
   push:
     paths:
       - ".github/workflows/android-instrumentation.yml"
+      - "sample-app/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "src/**"
@@ -83,10 +85,13 @@ jobs:
       - name: Verify JNI Libraries
         run: scripts/verify-android-native.sh
 
+      - name: Build Consumer Sample With JNI
+        run: ./gradlew :sample-app:assembleRelease
+
       - name: Run Connected Tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 36
           arch: x86_64
           target: google_apis
-          script: ./gradlew :tantivy-android:connectedDebugAndroidTest
+          script: ./gradlew :tantivy-android:connectedDebugAndroidTest :sample-app:connectedDebugAndroidTest

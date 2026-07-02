@@ -46,6 +46,14 @@ Build the Android AAR after native libraries are copied into `tantivy-android/sr
 
 The AAR includes consumer R8/ProGuard rules that keep the JNI bridge class name stable for native symbol lookup.
 
+Build the consumer sample app, including release minification:
+
+```bash
+./gradlew :sample-app:assembleRelease
+```
+
+The sample app lives in `sample-app` and intentionally depends on the library as an external consumer would. Use it to smoke test indexing, search flows, packaged JNI libraries, and R8 behavior before cutting a release.
+
 Publish to the local Maven cache:
 
 ```bash
@@ -118,6 +126,7 @@ val page = index.search(
 ```
 
 See [docs/API.md](docs/API.md) for the full API guide.
+See [docs/PRODUCTION.md](docs/PRODUCTION.md) for release gates and production-readiness checks.
 
 ## Release
 
@@ -136,12 +145,25 @@ It uploads:
 - raw JNI library archive
 - per-ABI `.so` files
 - cargo and Gradle dependency metadata
+- CycloneDX SBOMs for Rust and Gradle dependencies
 - release build info
 - SHA-256 checksums
 
 If `SIGNING_KEY` and `SIGNING_PASSWORD` are configured in the release environment, Maven publication artifacts are signed.
 
 For tag `v0.1.0`, the published Maven version is `0.1.0`.
+
+## Compatibility Policy
+
+Until 1.0, the high-level coroutine API is intended to remain source-compatible across patch releases unless a changelog entry calls out a migration. APIs annotated with `@AdvancedTantivyApi`, native JSON contracts, and release artifact layout may change between minor pre-1.0 versions.
+
+Before promoting a release to production use, verify:
+
+- Rust tests, clippy, audit, and dependency policy pass.
+- Android unit tests, Detekt, Android Lint, Dokka, and API compatibility pass.
+- Connected Android instrumentation passes on an emulator with packaged JNI libraries.
+- `:sample-app:assembleRelease` succeeds with R8 enabled.
+- The tagged release artifacts can be consumed from a separate Android project.
 
 ## License
 

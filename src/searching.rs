@@ -68,6 +68,7 @@ fn execute_search(
     let selected_fields = if request.selected_fields.is_empty() {
         None
     } else {
+        validate_selected_fields(index, &request.selected_fields)?;
         Some(
             request
                 .selected_fields
@@ -103,6 +104,24 @@ fn execute_search(
         }));
     }
     Ok(hits)
+}
+
+fn validate_selected_fields(
+    index: &model::NativeIndex,
+    selected_fields: &[String],
+) -> NativeResult<()> {
+    for name in selected_fields {
+        let field = index
+            .fields
+            .get(name)
+            .ok_or_else(|| NativeError::Search(format!("unknown selected field '{name}'")))?;
+        if !field.stored {
+            return Err(NativeError::Search(format!(
+                "selected field '{name}' must be stored"
+            )));
+        }
+    }
+    Ok(())
 }
 
 fn execute_sorted_search(

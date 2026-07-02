@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/android.yml"
+      - "sample-app/**"
       - "build.gradle.kts"
       - "settings.gradle.kts"
       - "gradle.properties"
@@ -16,6 +17,7 @@ on:
   push:
     paths:
       - ".github/workflows/android.yml"
+      - "sample-app/**"
       - "build.gradle.kts"
       - "settings.gradle.kts"
       - "gradle.properties"
@@ -71,3 +73,6 @@ jobs:
 
       - name: Test
         run: ./gradlew :tantivy-android:testDebugUnitTest
+
+      - name: Consumer Sample Release Build
+        run: ./gradlew :sample-app:assembleRelease

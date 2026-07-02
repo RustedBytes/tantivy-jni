@@ -3,7 +3,10 @@ package com.rustedbytes.tantivy
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.async
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flow
@@ -17,6 +20,8 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TantivyIndexTest {
@@ -132,6 +137,32 @@ class TantivyIndexTest {
         assertFailsWith<TantivyIndexClosedException> {
             index.add(IndexDocument.build { text("title", "value") })
         }
+    }
+
+    @Test
+    fun closeWhileAddIsInFlightClosesHandleAndRejectsLaterOperations() = runTest {
+        val enteredAdd = CountDownLatch(1)
+        val releaseAdd = CountDownLatch(1)
+        val bridge = FakeBridge(
+            beforeAdd = {
+                enteredAdd.countDown()
+                check(releaseAdd.await(5, TimeUnit.SECONDS))
+            },
+        )
+        val index = TantivyIndex.fromNativeHandle(1, IndexOptions(dispatcher = Dispatchers.Default), bridge)
+
+        val addJob = async {
+            index.add(IndexDocument.build { text("title", "value") })
+        }
+
+        assertTrue(enteredAdd.await(5, TimeUnit.SECONDS))
+        index.closeSuspending()
+        assertFailsWith<TantivyIndexClosedException> {
+            index.search(SearchQuery("value"))
+        }
+        releaseAdd.countDown()
+
+        assertEquals(1, addJob.await().documentsAdded)
     }
 
     @Test
@@ -310,6 +341,7 @@ class TantivyIndexTest {
 
 private class FakeBridge(
     private val failingAddCalls: MutableSet<Int> = mutableSetOf(),
+    private val beforeAdd: () -> Unit = {},
     private val searchHits: JSONArray = JSONArray()
         .put(
             JSONObject()
@@ -337,6 +369,7 @@ private class FakeBridge(
 
     override fun addDocuments(handle: Long, documentsJson: String): String {
         addCalls += 1
+        beforeAdd()
         if (failingAddCalls.remove(addCalls)) {
             throw WriteException("Configured add failure")
         }

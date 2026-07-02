@@ -1,4 +1,6 @@
 /target
+.DS_Store
+**/.DS_Store
 .gradle/
 build/
 **/build/

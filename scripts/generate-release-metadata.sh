@@ -10,6 +10,23 @@ mkdir -p "$DIST_DIR"
 
 cargo metadata --format-version 1 --locked > "$DIST_DIR/cargo-metadata-${RELEASE_TAG_NAME}.json"
 
+cargo cyclonedx \
+  --format json \
+  --spec-version 1.5 \
+  --override-filename "rust-cyclonedx-${RELEASE_TAG_NAME}" \
+  --quiet
+mv "$ROOT_DIR/rust-cyclonedx-${RELEASE_TAG_NAME}.json" \
+  "$DIST_DIR/rust-cyclonedx-${RELEASE_TAG_NAME}.json"
+
+"$ROOT_DIR/gradlew" \
+  --no-daemon \
+  --console=plain \
+  cyclonedxBom
+cp "$ROOT_DIR/build/reports/cyclonedx/bom.json" \
+  "$DIST_DIR/gradle-cyclonedx-${RELEASE_TAG_NAME}.json"
+cp "$ROOT_DIR/build/reports/cyclonedx/bom.xml" \
+  "$DIST_DIR/gradle-cyclonedx-${RELEASE_TAG_NAME}.xml"
+
 "$ROOT_DIR/gradlew" \
   --no-daemon \
   --console=plain \

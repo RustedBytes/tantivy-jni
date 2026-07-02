@@ -62,6 +62,9 @@ jobs:
       - name: Rust Clippy
         run: cargo clippy --all-targets -- -D warnings
 
+      - name: Install Cargo CycloneDX
+        run: cargo install cargo-cyclonedx --version 0.5.9 --locked
+
       - name: Kotlin Static Checks
         run: ./gradlew :tantivy-android:detekt apiCheck
 
@@ -77,7 +80,8 @@ jobs:
           ./gradlew \
             -PVERSION_NAME="${RELEASE_VERSION}" \
             :tantivy-android:assembleRelease \
-            :tantivy-android:publishReleasePublicationToReleaseRepository
+            :tantivy-android:publishReleasePublicationToReleaseRepository \
+            :sample-app:assembleRelease
         env:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
           SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}

@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "tantivy-jni"
 include(":tantivy-android")
+include(":sample-app")

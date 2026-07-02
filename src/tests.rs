@@ -1,4 +1,6 @@
 use serde_json::{Value as JsonValue, json};
+use std::fs;
+use std::time::Instant;
 
 use crate::NativeError;
 use crate::model::SchemaRequest;
@@ -194,6 +196,88 @@ fn rejects_sort_on_non_fast_field() {
 }
 
 #[test]
+fn rejects_unknown_selected_field() {
+    let dir = tempfile::tempdir().unwrap();
+    let handle = open_index(
+        dir.path().to_str().unwrap(),
+        &schema_json(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap();
+
+    let error = search(
+        handle,
+        &json!({
+            "query": "android",
+            "limit": 10,
+            "offset": 0,
+            "selectedFields": ["missing"]
+        })
+        .to_string(),
+    )
+    .unwrap_err();
+    assert!(matches!(error, NativeError::Search(_)));
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn reopens_committed_index_without_create() {
+    let dir = tempfile::tempdir().unwrap();
+    let handle = open_index(
+        dir.path().to_str().unwrap(),
+        &schema_json(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap();
+    add_documents(
+        handle,
+        &json!({
+            "documents": [{
+                "fields": {
+                    "title": [{ "type": "text", "value": "persisted android document" }],
+                    "id": [{ "type": "string", "value": "doc-persisted" }]
+                }
+            }]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    commit_and_refresh(handle).unwrap();
+    close_index(handle).unwrap();
+
+    let reopened = open_index(
+        dir.path().to_str().unwrap(),
+        &schema_json(),
+        &json!({ "create": false, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap();
+    refresh(reopened).unwrap();
+    let result = search(
+        reopened,
+        &json!({ "query": "persisted", "limit": 10, "offset": 0 }).to_string(),
+    )
+    .unwrap();
+    let result: JsonValue = serde_json::from_str(&result).unwrap();
+    assert_eq!(result["hits"].as_array().unwrap().len(), 1);
+    close_index(reopened).unwrap();
+}
+
+#[test]
+fn rejects_corrupted_existing_index_directory() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(dir.path().join("meta.json"), "{not-valid-index-meta").unwrap();
+
+    let error = open_index(
+        dir.path().to_str().unwrap(),
+        &schema_json(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap_err();
+
+    assert!(matches!(error, NativeError::Open(_)));
+}
+
+#[test]
 fn delete_term_removes_document_after_commit_and_refresh() {
     let dir = tempfile::tempdir().unwrap();
     let handle = open_index(
@@ -341,4 +425,57 @@ fn rejects_unknown_schema_default_search_field() {
 
     let error = build_schema(&schema).unwrap_err();
     assert!(matches!(error, NativeError::Schema(_)));
+}
+
+#[test]
+#[ignore = "performance smoke test; run explicitly with --ignored --nocapture"]
+fn indexing_search_smoke_benchmark() {
+    let dir = tempfile::tempdir().unwrap();
+    let handle = open_index(
+        dir.path().to_str().unwrap(),
+        &schema_json(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap();
+
+    let documents = (0..1_000)
+        .map(|index| {
+            json!({
+                "fields": {
+                    "title": [{ "type": "text", "value": format!("android benchmark document {index}") }],
+                    "id": [{ "type": "string", "value": format!("doc-{index}") }],
+                    "price": [{ "type": "i64", "value": index }]
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+
+    let started = Instant::now();
+    add_documents(handle, &json!({ "documents": documents }).to_string()).unwrap();
+    let add_elapsed = started.elapsed();
+
+    let started = Instant::now();
+    commit_and_refresh(handle).unwrap();
+    let commit_refresh_elapsed = started.elapsed();
+
+    let started = Instant::now();
+    let result = search(
+        handle,
+        &json!({
+            "query": "android",
+            "limit": 20,
+            "offset": 0,
+            "sort": { "field": "price", "order": "desc" }
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let search_elapsed = started.elapsed();
+
+    let result: JsonValue = serde_json::from_str(&result).unwrap();
+    assert_eq!(result["hits"].as_array().unwrap().len(), 20);
+    eprintln!("indexed 1000 docs in {add_elapsed:?}");
+    eprintln!("commit+refresh took {commit_refresh_elapsed:?}");
+    eprintln!("sorted search took {search_elapsed:?}");
+    close_index(handle).unwrap();
 }
