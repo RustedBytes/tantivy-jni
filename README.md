@@ -34,7 +34,8 @@ cargo deny check
 Build native Android JNI libraries:
 
 ```bash
-export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018"
+./install_android_ndk.sh
+source .android/ndk.env
 scripts/build-android-native.sh
 ```
 

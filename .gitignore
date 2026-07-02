@@ -6,4 +6,5 @@ build/
 **/build/
 dist/
 local.properties
+.android/
 tantivy-android/src/main/jniLibs/

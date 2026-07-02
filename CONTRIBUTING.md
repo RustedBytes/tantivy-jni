@@ -23,8 +23,8 @@ Android unit tests require a configured Android SDK. Either set `ANDROID_HOME` o
 Install the Android NDK version used by CI:
 
 ```bash
-sdkmanager "ndk;27.2.12479018"
-export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018"
+./install_android_ndk.sh
+source .android/ndk.env
 ```
 
 Build native libraries:
