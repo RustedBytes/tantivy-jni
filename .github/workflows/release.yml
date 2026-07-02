@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  ANDROID_NDK_VERSION: "27.2.12479018"
+
+jobs:
+  android-jni:
+    name: Build Android JNI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set Up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.86.0
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Set Up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: |
+          sdkmanager "ndk;${ANDROID_NDK_VERSION}"
+          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/${ANDROID_NDK_VERSION}" >> "${GITHUB_ENV}"
+
+      - name: Build JNI Libraries
+        run: scripts/build-android-native.sh
+
+      - name: Package JNI Libraries
+        run: |
+          set -euo pipefail
+          RELEASE_TAG_NAME="${GITHUB_REF_NAME//\//-}"
+          mkdir -p dist
+          tar -czf "dist/tantivy-jni-${RELEASE_TAG_NAME}-android-jni.tar.gz" \
+            -C tantivy-android/src/main jniLibs
+          zip -r "dist/tantivy-jni-${RELEASE_TAG_NAME}-android-jni.zip" \
+            tantivy-android/src/main/jniLibs
+          cp tantivy-android/src/main/jniLibs/arm64-v8a/libtantivy_jni.so \
+            "dist/libtantivy_jni-${RELEASE_TAG_NAME}-arm64-v8a.so"
+          cp tantivy-android/src/main/jniLibs/x86_64/libtantivy_jni.so \
+            "dist/libtantivy_jni-${RELEASE_TAG_NAME}-x86_64.so"
+          sha256sum dist/* > "dist/checksums-${RELEASE_TAG_NAME}.txt"
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tantivy-jni-android-${{ github.ref_name }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
