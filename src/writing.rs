@@ -61,6 +61,16 @@ pub(crate) fn delete_term(handle: i64, field_name: &str, value_json: &str) -> Na
     })
 }
 
+pub(crate) fn delete_all_documents(handle: i64) -> NativeResult<String> {
+    with_index(handle, |index| {
+        let opstamp = index
+            .writer
+            .delete_all_documents()
+            .map_err(|error| NativeError::Write(error.to_string()))?;
+        Ok(json!({ "opstamp": opstamp }).to_string())
+    })
+}
+
 pub(crate) fn commit(handle: i64) -> NativeResult<String> {
     with_index(handle, |index| {
         let opstamp = index

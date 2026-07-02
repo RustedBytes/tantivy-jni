@@ -95,6 +95,12 @@ class IndexSchema private constructor(
         fun json(name: String, stored: Boolean = true, indexed: Boolean = true, fast: Boolean = false) =
             field(name, FieldType.Json, stored, indexed, fast)
 
+        fun facet(name: String, stored: Boolean = true) =
+            field(name, FieldType.Facet, stored, indexed = false, fast = false)
+
+        fun ipAddr(name: String, stored: Boolean = true, indexed: Boolean = true, fast: Boolean = false) =
+            field(name, FieldType.IpAddr, stored, indexed, fast)
+
         fun field(
             name: String,
             type: FieldType,

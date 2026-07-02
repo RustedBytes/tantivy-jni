@@ -17,6 +17,8 @@ pub(crate) enum FieldKind {
     Bytes,
     Date,
     Json,
+    Facet,
+    IpAddr,
 }
 
 #[derive(Debug, Deserialize)]

@@ -51,6 +51,11 @@ class TantivyIndex internal constructor(
             parseDeleteResult(bridge.deleteQuery(handle, query, org.json.JSONArray(defaultFields).toString()))
         }
 
+    suspend fun deleteAll(): CommitResult =
+        ioCall(stateOnError = true) { handle ->
+            parseDeleteAllResult(bridge.deleteAllDocuments(handle))
+        }
+
     suspend fun commit(): CommitResult {
         state.value = IndexState.Committing
         return ioCall(stateOnError = true) { handle ->

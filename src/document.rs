@@ -1,5 +1,8 @@
+use std::net::IpAddr;
+use std::str::FromStr;
+
 use serde_json::{Value as JsonValue, json};
-use tantivy::schema::{TantivyDocument, Term, Value};
+use tantivy::schema::{Facet, TantivyDocument, Term, Value};
 use tantivy::schema::document::OwnedValue;
 use tantivy::DateTime;
 
@@ -69,6 +72,22 @@ pub(crate) fn term_for_value(
             let millis = json_i64(value.value, "date millis")?;
             let dt = DateTime::from_timestamp_millis(millis);
             Ok(Term::from_field_date(field.field, dt))
+        }
+        FieldKind::Facet => {
+            let path = json_string(value.value, "facet path string")?;
+            let facet = Facet::from_text(&path)
+                .map_err(|e| NativeError::Write(format!("invalid facet path: {e}")))?;
+            Ok(Term::from_facet(field.field, &facet))
+        }
+        FieldKind::IpAddr => {
+            let addr_str = json_string(value.value, "ip address string")?;
+            let ip = IpAddr::from_str(&addr_str)
+                .map_err(|e| NativeError::Write(format!("invalid ip address: {e}")))?;
+            let ipv6 = match ip {
+                IpAddr::V4(v4) => v4.to_ipv6_mapped(),
+                IpAddr::V6(v6) => v6,
+            };
+            Ok(Term::from_field_ip_addr(field.field, ipv6))
         }
         FieldKind::Json => Err(NativeError::Write(format!(
             "term search/delete is not supported directly on json field '{field_name}'"
@@ -148,6 +167,22 @@ fn add_value(
             let millis = json_i64(value.value, "date millis")?;
             document.add_date(field.field, DateTime::from_timestamp_millis(millis));
         }
+        FieldKind::Facet => {
+            let path = json_string(value.value, "facet path string")?;
+            let facet = Facet::from_text(&path)
+                .map_err(|e| NativeError::Write(format!("invalid facet path: {e}")))?;
+            document.add_facet(field.field, facet);
+        }
+        FieldKind::IpAddr => {
+            let addr_str = json_string(value.value, "ip address string")?;
+            let ip = IpAddr::from_str(&addr_str)
+                .map_err(|e| NativeError::Write(format!("invalid ip address: {e}")))?;
+            let ipv6 = match ip {
+                IpAddr::V4(v4) => v4.to_ipv6_mapped(),
+                IpAddr::V6(v6) => v6,
+            };
+            document.add_ip_addr(field.field, ipv6);
+        }
         FieldKind::Json => {
             let owned = json_to_owned_value(value.value);
             document.add_field_value(field.field, &owned);
@@ -198,6 +233,16 @@ where
         FieldKind::Date => value
             .as_datetime()
             .map(|dt| json!({ "type": "date", "value": dt.into_timestamp_millis() })),
+        FieldKind::Facet => value
+            .as_facet()
+            .and_then(|encoded| {
+                Facet::from_encoded(encoded.as_bytes().to_vec())
+                    .ok()
+                    .map(|facet| json!({ "type": "facet", "value": facet.to_path_string() }))
+            }),
+        FieldKind::IpAddr => value
+            .as_ip_addr()
+            .map(|ip| json!({ "type": "ipaddr", "value": ip.to_string() })),
         FieldKind::Json => {
             let owned = OwnedValue::from(value.as_value());
             let json_val = serde_json::to_value(&owned).unwrap_or(JsonValue::Null);

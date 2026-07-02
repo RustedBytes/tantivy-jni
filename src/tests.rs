@@ -590,3 +590,159 @@ fn test_ram_directory_date_json_search_options() {
 
     close_index(handle).unwrap();
 }
+
+#[test]
+fn facet_field_indexing() {
+    let handle = open_index(
+        ":memory:",
+        &json!({
+            "fields": [
+                { "name": "title", "type": "text", "stored": true, "indexed": true },
+                { "name": "category", "type": "facet", "stored": true, "indexed": false }
+            ],
+            "defaultSearchFields": ["title"]
+        })
+        .to_string(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap();
+
+    add_documents(
+        handle,
+        &json!({
+            "documents": [{
+                "fields": {
+                    "title": [{ "type": "text", "value": "my android phone" }],
+                    "category": [{ "type": "facet", "value": "/electronics/phones" }]
+                }
+            }]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    commit_and_refresh(handle).unwrap();
+
+    let result = search(
+        handle,
+        &json!({ "query": "android", "limit": 10, "offset": 0 }).to_string(),
+    )
+    .unwrap();
+    let result: JsonValue = serde_json::from_str(&result).unwrap();
+    let hits = result["hits"].as_array().unwrap();
+    assert_eq!(hits.len(), 1);
+    let category = &hits[0]["fields"]["category"][0];
+    assert_eq!(category["type"].as_str(), Some("facet"));
+    assert_eq!(category["value"].as_str(), Some("/electronics/phones"));
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn ip_addr_field_indexing() {
+    let handle = open_index(
+        ":memory:",
+        &json!({
+            "fields": [
+                { "name": "title", "type": "text", "stored": true, "indexed": true },
+                { "name": "ip", "type": "ipaddr", "stored": true, "indexed": true, "fast": true }
+            ],
+            "defaultSearchFields": ["title"]
+        })
+        .to_string(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap();
+
+    add_documents(
+        handle,
+        &json!({
+            "documents": [
+                {
+                    "fields": {
+                        "title": [{ "type": "text", "value": "server alpha" }],
+                        "ip": [{ "type": "ipaddr", "value": "192.168.1.1" }]
+                    }
+                },
+                {
+                    "fields": {
+                        "title": [{ "type": "text", "value": "server beta" }],
+                        "ip": [{ "type": "ipaddr", "value": "::1" }]
+                    }
+                }
+            ]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    commit_and_refresh(handle).unwrap();
+
+    let result = search(
+        handle,
+        &json!({ "query": "server", "limit": 10, "offset": 0 }).to_string(),
+    )
+    .unwrap();
+    let result: JsonValue = serde_json::from_str(&result).unwrap();
+    let hits = result["hits"].as_array().unwrap();
+    assert_eq!(hits.len(), 2);
+    // Both should have an ip field of type "ipaddr" with string value
+    for hit in hits {
+        let ip = &hit["fields"]["ip"][0];
+        assert_eq!(ip["type"].as_str(), Some("ipaddr"));
+        assert!(ip["value"].as_str().is_some());
+    }
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn delete_all_documents_clears_index() {
+    let handle = open_index(
+        ":memory:",
+        &json!({
+            "fields": [
+                { "name": "title", "type": "text", "stored": true, "indexed": true }
+            ],
+            "defaultSearchFields": ["title"]
+        })
+        .to_string(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap();
+
+    add_documents(
+        handle,
+        &json!({
+            "documents": [
+                { "fields": { "title": [{ "type": "text", "value": "first document" }] } },
+                { "fields": { "title": [{ "type": "text", "value": "second document" }] } }
+            ]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    commit_and_refresh(handle).unwrap();
+
+    // Verify documents exist
+    let before = search(
+        handle,
+        &json!({ "query": "document", "limit": 10, "offset": 0 }).to_string(),
+    )
+    .unwrap();
+    let before: JsonValue = serde_json::from_str(&before).unwrap();
+    assert_eq!(before["hits"].as_array().unwrap().len(), 2);
+
+    // Delete all documents
+    let del_result = crate::delete_all_documents(handle).unwrap();
+    let del_result: JsonValue = serde_json::from_str(&del_result).unwrap();
+    assert!(del_result["opstamp"].as_u64().is_some());
+
+    commit_and_refresh(handle).unwrap();
+
+    // Verify index is empty
+    let after = search(
+        handle,
+        &json!({ "query": "document", "limit": 10, "offset": 0 }).to_string(),
+    )
+    .unwrap();
+    let after: JsonValue = serde_json::from_str(&after).unwrap();
+    assert_eq!(after["hits"].as_array().unwrap().len(), 0);
+    close_index(handle).unwrap();
+}

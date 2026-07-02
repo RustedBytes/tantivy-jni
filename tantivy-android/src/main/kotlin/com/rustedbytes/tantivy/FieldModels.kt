@@ -12,6 +12,8 @@ enum class FieldType(internal val wireName: String) {
     Bytes("bytes"),
     Date("date"),
     Json("json"),
+    Facet("facet"),
+    IpAddr("ipaddr"),
     ;
 
     companion object {
@@ -92,4 +94,23 @@ sealed class FieldValue {
         override val type = FieldType.Json
         override fun rawJsonValue(): Any = value
     }
+
+    /**
+     * Represents a hierarchical facet path, e.g. "/electronics/phones".
+     * Path segments are separated by '/' and must not be empty.
+     */
+    data class Facet(val path: kotlin.String) : FieldValue() {
+        override val type = FieldType.Facet
+        override fun rawJsonValue(): Any = path
+    }
+
+    /**
+     * Represents an IP address (IPv4 or IPv6) as a string, e.g. "192.168.1.1" or "::1".
+     * The value is stored and indexed as an IPv6 address internally (IPv4 is mapped to IPv6).
+     */
+    data class IpAddr(val address: kotlin.String) : FieldValue() {
+        override val type = FieldType.IpAddr
+        override fun rawJsonValue(): Any = address
+    }
 }
+

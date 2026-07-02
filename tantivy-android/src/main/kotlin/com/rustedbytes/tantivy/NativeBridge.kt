@@ -6,6 +6,7 @@ internal interface NativeBridge {
     fun addDocuments(handle: Long, documentsJson: String): String
     fun deleteTerm(handle: Long, field: String, valueJson: String): String
     fun deleteQuery(handle: Long, query: String, defaultFieldsJson: String): String
+    fun deleteAllDocuments(handle: Long): String
     fun commit(handle: Long): String
     fun refresh(handle: Long): String
     fun commitAndRefresh(handle: Long): String
@@ -36,6 +37,9 @@ internal object JniNativeBridge : NativeBridge {
     override fun deleteQuery(handle: Long, query: String, defaultFieldsJson: String): String =
         NativeTantivy.nativeDeleteQuery(handle, query, defaultFieldsJson)
 
+    override fun deleteAllDocuments(handle: Long): String =
+        NativeTantivy.nativeDeleteAllDocuments(handle)
+
     override fun commit(handle: Long): String = NativeTantivy.nativeCommit(handle)
 
     override fun refresh(handle: Long): String = NativeTantivy.nativeRefresh(handle)
@@ -54,6 +58,7 @@ internal object NativeTantivy {
     external fun nativeAddDocuments(handle: Long, documentsJson: String): String
     external fun nativeDeleteTerm(handle: Long, field: String, valueJson: String): String
     external fun nativeDeleteQuery(handle: Long, query: String, defaultFieldsJson: String): String
+    external fun nativeDeleteAllDocuments(handle: Long): String
     external fun nativeCommit(handle: Long): String
     external fun nativeRefresh(handle: Long): String
     external fun nativeCommitAndRefresh(handle: Long): String

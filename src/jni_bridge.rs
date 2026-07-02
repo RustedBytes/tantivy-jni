@@ -6,7 +6,7 @@ use jni::strings::JNIString;
 use jni::sys::{jlong, jobject};
 
 use crate::{
-    NativeError, NativeResult, add_documents, close_index, commit, commit_and_refresh, delete_term,
+    NativeError, NativeResult, add_documents, close_index, commit, commit_and_refresh, delete_all_documents, delete_term,
     delete_query, open_index, refresh, schema_info, search,
 };
 
@@ -191,3 +191,8 @@ pub extern "system" fn Java_com_rustedbytes_tantivy_NativeTantivy_nativeDeleteQu
     let default_fields_json = read_string(default_fields_json);
     jni_string(env, || delete_query(handle, &query, &default_fields_json))
 }
+
+export_handle_string!(
+    Java_com_rustedbytes_tantivy_NativeTantivy_nativeDeleteAllDocuments,
+    delete_all_documents
+);

@@ -85,6 +85,11 @@ internal fun parseSearchPage(json: String): SearchPage {
     )
 }
 
+internal fun parseDeleteAllResult(json: String): CommitResult {
+    val objectJson = JSONObject(json)
+    return CommitResult(objectJson.getLong("opstamp"))
+}
+
 private fun parseFields(fieldsJson: JSONObject): Map<String, List<FieldValue>> =
     fieldsJson.keys().asSequence().associateWith { name ->
         val values = fieldsJson.getJSONArray(name)
@@ -102,8 +107,11 @@ private fun parseFieldValue(valueJson: JSONObject): FieldValue =
         FieldType.Bytes.wireName -> FieldValue.Bytes(parseBytes(valueJson.getJSONArray("value")))
         FieldType.Date.wireName -> FieldValue.Date(java.time.Instant.ofEpochMilli(valueJson.getLong("value")))
         FieldType.Json.wireName -> FieldValue.Json(valueJson.getJSONObject("value"))
+        FieldType.Facet.wireName -> FieldValue.Facet(valueJson.getString("value"))
+        FieldType.IpAddr.wireName -> FieldValue.IpAddr(valueJson.getString("value"))
         else -> throw NativeLibraryException("Unknown field value type: ${valueJson.getString("type")}")
     }
 
 private fun parseBytes(bytesJson: JSONArray): ByteArray =
     ByteArray(bytesJson.length()) { index -> bytesJson.getInt(index).toByte() }
+
