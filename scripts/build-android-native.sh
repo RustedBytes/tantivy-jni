@@ -46,15 +46,23 @@ env_key_for_target() {
   echo "$1" | tr '[:lower:]-' '[:lower:]_'
 }
 
+cargo_env_key_for_target() {
+  echo "$1" | tr '[:lower:]-' '[:upper:]_'
+}
+
 rm -rf "$ANDROID_MODULE"
 
 for abi in $ANDROID_ABIS; do
   target="$(target_for_abi "$abi")"
   target_key="$(env_key_for_target "$target")"
+  cargo_target_key="$(cargo_env_key_for_target "$target")"
+  cc="$(cc_for_abi "$abi")"
   rustup target add "$target"
 
   export "AR_${target_key}=$TOOLCHAIN_DIR/bin/llvm-ar"
-  export "CC_${target_key}=$(cc_for_abi "$abi")"
+  export "CC_${target_key}=$cc"
+  export "CARGO_TARGET_${cargo_target_key}_AR=$TOOLCHAIN_DIR/bin/llvm-ar"
+  export "CARGO_TARGET_${cargo_target_key}_LINKER=$cc"
 
   cargo build --release --target "$target"
 
