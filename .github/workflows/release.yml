@@ -201,7 +201,7 @@ jobs:
           sbom-path: dist/rust-cyclonedx-${{ env.RELEASE_TAG_NAME }}.json
 
       - name: Upload Build Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tantivy-jni-android-${{ env.RELEASE_TAG_NAME }}
           path: dist/*
