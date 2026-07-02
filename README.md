@@ -52,7 +52,15 @@ Build the consumer sample app, including release minification:
 ./gradlew :sample-app:assembleRelease
 ```
 
-The sample app lives in `sample-app` and intentionally depends on the library as an external consumer would. Use it to smoke test indexing, search flows, packaged JNI libraries, and R8 behavior before cutting a release.
+The sample app lives in `sample-app` and uses the in-repo project dependency for fast development. Use it to smoke test indexing, search flows, packaged JNI libraries, and R8 behavior before cutting a release.
+
+Verify consumption from the repo-local Maven publication:
+
+```bash
+scripts/verify-maven-consumer.sh
+```
+
+The fixture in `fixtures/maven-consumer` is a separate Gradle build that depends on `com.rustedbytes:tantivy-android` from `tantivy-android/build/repository`, not on the in-repo project dependency.
 
 Publish to the local Maven cache:
 
@@ -91,6 +99,12 @@ repositories {
 Release builds use the pushed tag as the version, stripping a leading `v`. For example, tag `v0.1.0` publishes version `0.1.0`.
 
 `apiCheck` compares the Kotlin public source API against `api/tantivy-android.api`. Run `./gradlew apiDump` intentionally when changing public API.
+
+Before tagging a release, verify the tag version, Cargo version, and changelog entry:
+
+```bash
+scripts/verify-release-version.sh 0.1.0
+```
 
 ## Usage
 
@@ -140,6 +154,7 @@ Pushing a Git tag runs `.github/workflows/release.yml`. The workflow builds JNI 
 It uploads:
 
 - release AAR
+- sample release APK for smoke testing
 - Maven repository archive
 - GitHub Packages Maven publication
 - raw JNI library archive
@@ -148,6 +163,7 @@ It uploads:
 - CycloneDX SBOMs for Rust and Gradle dependencies
 - release build info
 - SHA-256 checksums
+- GitHub artifact attestations for release checksums and SBOMs
 
 If `SIGNING_KEY` and `SIGNING_PASSWORD` are configured in the release environment, Maven publication artifacts are signed.
 
@@ -163,6 +179,8 @@ Before promoting a release to production use, verify:
 - Android unit tests, Detekt, Android Lint, Dokka, and API compatibility pass.
 - Connected Android instrumentation passes on an emulator with packaged JNI libraries.
 - `:sample-app:assembleRelease` succeeds with R8 enabled.
+- `scripts/verify-maven-consumer.sh` proves the Maven artifact is consumable by a separate Gradle build.
+- Release artifacts are checksummed and attested with GitHub artifact attestations.
 - The tagged release artifacts can be consumed from a separate Android project.
 
 ## License

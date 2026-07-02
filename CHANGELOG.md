@@ -6,6 +6,8 @@ This project follows semantic versioning after the first stable `1.0.0` release.
 
 ## Unreleased
 
+## 0.1.0 - 2026-07-02
+
 - Added Android Kotlin API backed by Rust/Tantivy through JNI.
 - Added coroutine-native indexing and search APIs.
 - Added typed schema, document, search, batch, and result models.
@@ -23,3 +25,5 @@ This project follows semantic versioning after the first stable `1.0.0` release.
 - Added GitHub Actions CI for Rust and Android/Kotlin checks.
 - Added tag-based release workflow for Android JNI and AAR artifacts.
 - Added Maven publishing configuration for the Android library.
+- Added release SBOMs, artifact verification, and an external Maven consumer fixture.
+- Added GitHub artifact attestations for release provenance and SBOMs.

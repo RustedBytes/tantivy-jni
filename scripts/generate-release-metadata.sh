@@ -21,6 +21,7 @@ mv "$ROOT_DIR/rust-cyclonedx-${RELEASE_TAG_NAME}.json" \
 "$ROOT_DIR/gradlew" \
   --no-daemon \
   --console=plain \
+  -PVERSION_NAME="$RELEASE_VERSION" \
   cyclonedxBom
 cp "$ROOT_DIR/build/reports/cyclonedx/bom.json" \
   "$DIST_DIR/gradle-cyclonedx-${RELEASE_TAG_NAME}.json"
@@ -30,6 +31,7 @@ cp "$ROOT_DIR/build/reports/cyclonedx/bom.xml" \
 "$ROOT_DIR/gradlew" \
   --no-daemon \
   --console=plain \
+  -PVERSION_NAME="$RELEASE_VERSION" \
   :tantivy-android:dependencies \
   --configuration releaseRuntimeClasspath \
   > "$DIST_DIR/gradle-release-runtime-dependencies-${RELEASE_TAG_NAME}.txt"

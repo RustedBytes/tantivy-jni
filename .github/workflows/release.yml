@@ -5,10 +5,17 @@ on:
     tags:
       - "*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version to build, for example 0.1.0 or 0.1.0-rc1"
+        required: true
 
 permissions:
   contents: write
   packages: write
+  id-token: write
+  attestations: write
+  artifact-metadata: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -30,13 +37,33 @@ jobs:
       - name: Validate Gradle Wrapper
         uses: gradle/actions/wrapper-validation@v4
 
+      - name: Resolve Release Version
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            RELEASE_VERSION="${GITHUB_REF_NAME#v}"
+            RELEASE_TAG_NAME="${GITHUB_REF_NAME//\//-}"
+          else
+            RELEASE_VERSION="${{ inputs.version }}"
+            RELEASE_VERSION="${RELEASE_VERSION#v}"
+            RELEASE_TAG_NAME="v${RELEASE_VERSION}"
+          fi
+          echo "RELEASE_VERSION=${RELEASE_VERSION}" >> "${GITHUB_ENV}"
+          echo "RELEASE_TAG_NAME=${RELEASE_TAG_NAME}" >> "${GITHUB_ENV}"
+
+      - name: Verify Release Version
+        run: scripts/verify-release-version.sh "$RELEASE_VERSION"
+
       - name: Set Up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.96.1
+          components: clippy, rustfmt
 
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
+
+      - name: Rust Format
+        run: cargo fmt --check
 
       - name: Set Up JDK
         uses: actions/setup-java@v4
@@ -62,11 +89,26 @@ jobs:
       - name: Rust Clippy
         run: cargo clippy --all-targets -- -D warnings
 
+      - name: Install Cargo Audit
+        run: cargo install cargo-audit --locked
+
+      - name: Rust Security Audit
+        run: cargo audit
+
+      - name: Install Cargo Deny
+        run: cargo install cargo-deny --locked
+
+      - name: Rust Dependency Policy
+        run: cargo deny check
+
       - name: Install Cargo CycloneDX
         run: cargo install cargo-cyclonedx --version 0.5.9 --locked
 
       - name: Kotlin Static Checks
-        run: ./gradlew :tantivy-android:detekt apiCheck
+        run: ./gradlew :tantivy-android:detekt :tantivy-android:lintRelease :tantivy-android:dokkaGenerate apiCheck
+
+      - name: Kotlin Unit Tests
+        run: ./gradlew :tantivy-android:testDebugUnitTest
 
       - name: Build JNI Libraries
         run: scripts/build-android-native.sh
@@ -76,7 +118,6 @@ jobs:
 
       - name: Build Android AAR
         run: |
-          RELEASE_VERSION="${GITHUB_REF_NAME#v}"
           ./gradlew \
             -PVERSION_NAME="${RELEASE_VERSION}" \
             :tantivy-android:assembleRelease \
@@ -86,9 +127,14 @@ jobs:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
           SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
 
+      - name: Verify Maven Consumer Fixture
+        run: |
+          VERSION_NAME="${RELEASE_VERSION}" \
+          PUBLISH_ARTIFACT=false \
+          scripts/verify-maven-consumer.sh
+
       - name: Publish To GitHub Packages
         run: |
-          RELEASE_VERSION="${GITHUB_REF_NAME#v}"
           ./gradlew \
             -PVERSION_NAME="${RELEASE_VERSION}" \
             :tantivy-android:publishReleasePublicationToGitHubPackagesRepository
@@ -111,10 +157,11 @@ jobs:
       - name: Package JNI Libraries
         run: |
           set -euo pipefail
-          RELEASE_TAG_NAME="${GITHUB_REF_NAME//\//-}"
           mkdir -p dist
           cp tantivy-android/build/outputs/aar/tantivy-android-release.aar \
             "dist/tantivy-android-${RELEASE_TAG_NAME}.aar"
+          cp sample-app/build/outputs/apk/release/sample-app-release-unsigned.apk \
+            "dist/sample-app-${RELEASE_TAG_NAME}-release.apk"
           tar -czf "dist/tantivy-android-${RELEASE_TAG_NAME}-maven-repository.tar.gz" \
             -C tantivy-android/build repository
           tar -czf "dist/tantivy-jni-${RELEASE_TAG_NAME}-android-jni.tar.gz" \
@@ -127,25 +174,42 @@ jobs:
           done
 
       - name: Generate Release Metadata
-        run: |
-          RELEASE_TAG_NAME="${GITHUB_REF_NAME//\//-}" \
-          RELEASE_VERSION="${GITHUB_REF_NAME#v}" \
-          scripts/generate-release-metadata.sh
+        run: scripts/generate-release-metadata.sh
+
+      - name: Verify Packaged Release Assets
+        run: scripts/verify-release-artifacts.sh
 
       - name: Generate Checksums
         run: |
-          RELEASE_TAG_NAME="${GITHUB_REF_NAME//\//-}"
           sha256sum dist/* > "dist/checksums-${RELEASE_TAG_NAME}.txt"
+
+      - name: Attest Release Artifacts
+        uses: actions/attest@v4
+        with:
+          subject-checksums: dist/checksums-${{ env.RELEASE_TAG_NAME }}.txt
+
+      - name: Attest Gradle SBOM
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/tantivy-android-${{ env.RELEASE_TAG_NAME }}.aar
+          sbom-path: dist/gradle-cyclonedx-${{ env.RELEASE_TAG_NAME }}.json
+
+      - name: Attest Rust SBOM
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/tantivy-jni-${{ env.RELEASE_TAG_NAME }}-android-jni.tar.gz
+          sbom-path: dist/rust-cyclonedx-${{ env.RELEASE_TAG_NAME }}.json
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tantivy-jni-android-${{ github.ref_name }}
+          name: tantivy-jni-android-${{ env.RELEASE_TAG_NAME }}
           path: dist/*
           if-no-files-found: error
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.RELEASE_TAG_NAME }}
           files: dist/*
           generate_release_notes: true

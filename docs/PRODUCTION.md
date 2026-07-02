@@ -12,12 +12,14 @@ cargo clippy --all-targets -- -D warnings
 cargo audit
 cargo deny check
 cargo cyclonedx --format json --spec-version 1.5
+scripts/verify-release-version.sh 0.1.0
 ./gradlew :tantivy-android:detekt
 ./gradlew :tantivy-android:lintRelease
 ./gradlew :tantivy-android:dokkaGenerate
 ./gradlew apiCheck
 ./gradlew :tantivy-android:testDebugUnitTest
 ./gradlew :sample-app:assembleRelease
+scripts/verify-maven-consumer.sh
 ```
 
 Run with an Android SDK, NDK, and emulator:
@@ -29,15 +31,27 @@ scripts/verify-android-native.sh
 ./gradlew :sample-app:connectedDebugAndroidTest
 ```
 
+Run after the release workflow packages `dist`:
+
+```bash
+scripts/verify-release-artifacts.sh
+```
+
 ## Release Candidate Flow
 
-1. Tag an RC, for example `v0.1.0-rc1`.
-2. Confirm `.github/workflows/release.yml` builds all configured Android ABIs.
-3. Download the generated AAR, JNI archives, Maven repository archive, metadata, and checksums.
+1. Add a changelog heading for the release base version, then tag an RC, for example `v0.1.0-rc1`.
+2. Confirm `.github/workflows/release.yml` passes Rust format, tests, clippy, audit, dependency policy, Android lint, unit tests, docs, API compatibility, and all configured Android ABI builds.
+3. Download the generated AAR, sample APK, JNI archives, Maven repository archive, metadata, and checksums.
 4. Verify the Rust and Gradle CycloneDX SBOM files are present in the release assets.
-5. Verify checksums before distributing artifacts.
+5. Verify checksums and GitHub artifact attestations before distributing artifacts.
 6. Consume the AAR from a separate Android project, not only from the in-repo sample.
 7. Promote to a final tag only after the separate app can index, commit, refresh, search, close, and reopen an index.
+
+Verify an attested artifact with GitHub CLI:
+
+```bash
+gh attestation verify dist/tantivy-android-v0.1.0.aar -R rustedbytes/tantivy-jni
+```
 
 ## Compatibility Matrix
 
@@ -76,4 +90,14 @@ The `sample-app` module is a consumer smoke test. It must keep building as a rel
 - the AAR packaging model works for Android application consumers
 - the sample app launches on an emulator with packaged JNI libraries
 
-Before a stable 1.0 release, also maintain at least one external sample or fixture project that depends on the published artifact instead of `project(":tantivy-android")`.
+## Maven Consumer Fixture
+
+The `fixtures/maven-consumer` build verifies that an Android app can consume `com.rustedbytes:tantivy-android` from the generated Maven repository instead of from `project(":tantivy-android")`.
+
+Run:
+
+```bash
+scripts/verify-maven-consumer.sh
+```
+
+The script publishes the Android library to `tantivy-android/build/repository`, then builds the fixture release APK with R8 enabled.

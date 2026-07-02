@@ -5,6 +5,8 @@ on:
   pull_request:
     paths:
       - ".github/workflows/android.yml"
+      - "fixtures/maven-consumer/**"
+      - "scripts/verify-maven-consumer.sh"
       - "sample-app/**"
       - "build.gradle.kts"
       - "settings.gradle.kts"
@@ -17,6 +19,8 @@ on:
   push:
     paths:
       - ".github/workflows/android.yml"
+      - "fixtures/maven-consumer/**"
+      - "scripts/verify-maven-consumer.sh"
       - "sample-app/**"
       - "build.gradle.kts"
       - "settings.gradle.kts"
@@ -76,3 +80,6 @@ jobs:
 
       - name: Consumer Sample Release Build
         run: ./gradlew :sample-app:assembleRelease
+
+      - name: Maven Consumer Fixture
+        run: scripts/verify-maven-consumer.sh
