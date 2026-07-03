@@ -13,9 +13,6 @@ on:
 permissions:
   contents: write
   packages: write
-  id-token: write
-  attestations: write
-  artifact-metadata: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -123,9 +120,6 @@ jobs:
             :tantivy-android:assembleRelease \
             :tantivy-android:publishReleasePublicationToReleaseRepository \
             :sample-app:assembleRelease
-        env:
-          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
-          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
 
       - name: Verify Maven Consumer Fixture
         run: |
@@ -141,8 +135,6 @@ jobs:
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
-          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
 
       - name: Verify Release Artifacts
         run: |
@@ -182,23 +174,6 @@ jobs:
       - name: Generate Checksums
         run: |
           sha256sum dist/* > "dist/checksums-${RELEASE_TAG_NAME}.txt"
-
-      - name: Attest Release Artifacts
-        uses: actions/attest@v4
-        with:
-          subject-checksums: dist/checksums-${{ env.RELEASE_TAG_NAME }}.txt
-
-      - name: Attest Gradle SBOM
-        uses: actions/attest@v4
-        with:
-          subject-path: dist/tantivy-android-${{ env.RELEASE_TAG_NAME }}.aar
-          sbom-path: dist/gradle-cyclonedx-${{ env.RELEASE_TAG_NAME }}.json
-
-      - name: Attest Rust SBOM
-        uses: actions/attest@v4
-        with:
-          subject-path: dist/tantivy-jni-${{ env.RELEASE_TAG_NAME }}-android-jni.tar.gz
-          sbom-path: dist/rust-cyclonedx-${{ env.RELEASE_TAG_NAME }}.json
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v7
