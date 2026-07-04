@@ -4,6 +4,10 @@ Android-first Kotlin bindings for [Tantivy](https://github.com/quickwit-oss/tant
 
 The library exposes a typed Kotlin API with coroutine-friendly indexing and search operations. Native calls remain synchronous and blocking internally; Kotlin dispatches them through caller-configurable coroutine dispatchers.
 
+## Demo in sample-app
+
+<img src="docs/demo.jpeg" height="400px" alt="Sample app"/>
+
 ## Status
 
 This project is still pre-1.0. The public high-level API is intended to be stable enough for app integration testing, while APIs marked with `@AdvancedTantivyApi` may change before 1.0.
