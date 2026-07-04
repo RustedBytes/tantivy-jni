@@ -235,6 +235,7 @@ class TantivyIndex internal constructor(
                 val handle = withContext(options.dispatcher) {
                     JniNativeBridge.openIndex(path, schema.toJson(), options.toJson())
                 }
+                if (handle <= 0L) throw IndexOpenException("native openIndex returned an invalid handle")
                 TantivyIndex(handle, options, JniNativeBridge)
             } catch (error: CancellationException) {
                 throw error

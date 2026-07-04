@@ -29,8 +29,18 @@ fn throw_error(env: &mut jni::Env<'_>, error: NativeError) {
         | NativeError::Tantivy(_) => "NativeLibraryException",
     };
     let class: JNIString = format!("{EXCEPTION_PACKAGE}/{class_name}").into();
-    let message: JNIString = error.to_string().into();
-    let _ = env.throw_new(class, message);
+    let message = error.to_string();
+    if env
+        .throw_new(class, JNIString::from(message.as_str()))
+        .is_err()
+    {
+        // The specific exception class may be unavailable (e.g. stripped or
+        // renamed by R8 in a minified app). Never leave the error silent.
+        let fallback: JNIString = "java/lang/RuntimeException".into();
+        let fallback_message: JNIString =
+            format!("{message} (failed to throw {EXCEPTION_PACKAGE}/{class_name})").into();
+        let _ = env.throw_new(fallback, fallback_message);
+    }
 }
 
 fn read_string(value: JString<'_>) -> String {

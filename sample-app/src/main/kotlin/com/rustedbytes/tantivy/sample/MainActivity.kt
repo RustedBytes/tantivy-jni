@@ -67,7 +67,6 @@ class MainActivity : Activity() {
         scope.launch {
             try {
                 val opened = openAndSeedIndex(status)
-                index = opened
                 opened.searchFlow(queryRequests).collect { state ->
                     results.text = state.render()
                 }
@@ -78,8 +77,8 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        index?.close()
         scope.cancel()
+        index?.close()
         super.onDestroy()
     }
 
@@ -94,6 +93,10 @@ class MainActivity : Activity() {
                 i64("rank", fast = true)
             },
         )
+        // Track the index as soon as it exists so onDestroy always closes it,
+        // even if seeding is cancelled; otherwise the native writer lock leaks
+        // for the process lifetime and the next open fails.
+        index = opened
         opened.indexDocuments(
             sampleArticles().map(::articleDocument).asFlow(),
             BatchOptions(
