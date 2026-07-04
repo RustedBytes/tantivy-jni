@@ -17,7 +17,7 @@ require_file() {
 require_zip_entry() {
   local archive="$1"
   local pattern="$2"
-  if ! unzip -l "$archive" | grep -q "$pattern"; then
+  if ! unzip -l "$archive" | grep -F "$pattern" >/dev/null; then
     echo "Archive $archive does not contain expected entry matching: $pattern" >&2
     exit 1
   fi
@@ -26,7 +26,7 @@ require_zip_entry() {
 require_tar_entry() {
   local archive="$1"
   local pattern="$2"
-  if ! tar -tzf "$archive" | grep -q "$pattern"; then
+  if ! tar -tzf "$archive" | grep -F "$pattern" >/dev/null; then
     echo "Archive $archive does not contain expected entry matching: $pattern" >&2
     exit 1
   fi
