@@ -226,6 +226,7 @@ class TantivyIndex internal constructor(
     }
 
     companion object {
+        @Suppress("ThrowsCount")
         suspend fun open(
             path: String,
             schema: IndexSchema,
