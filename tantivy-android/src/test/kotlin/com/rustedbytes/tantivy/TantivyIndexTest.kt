@@ -378,7 +378,9 @@ class TantivyIndexTest {
         assertEquals(FieldValue.Date(java.time.Instant.ofEpochMilli(1000)), document.fields["date_field"]?.first())
         assertEquals(FieldValue.Facet("/category/test"), document.fields["facet_field"]?.first())
         assertEquals(FieldValue.IpAddr("127.0.0.1"), document.fields["ip_addr_field"]?.first())
-        assertEquals(FieldValue.Json(JSONObject("""{"key":"value"}""")).rawJsonValue().toString(), document.fields["json_field"]?.first()?.rawJsonValue().toString())
+        val expectedJson = FieldValue.Json(JSONObject("""{"key":"value"}"""))
+        val actualJson = document.fields["json_field"]?.first()
+        assertEquals(expectedJson.rawJsonValue().toString(), actualJson?.rawJsonValue().toString())
         val bytesVal = document.fields["bytes_field"]?.first() as FieldValue.Bytes
         assertTrue(bytesVal.toByteArray().contentEquals(byteArrayOf(1, 2, 3)))
     }
@@ -391,13 +393,14 @@ class TantivyIndexTest {
 
     @Test
     fun tantivyIndexOpenFailsWithoutNativeLibrary() = runTest {
-        try {
+        val failure = assertFailsWith<Throwable> {
             TantivyClient.open("test_path", TantivyClient.schema { text("title") })
-        } catch (e: NativeLibraryException) {
-            // expected
-        } catch (e: UnsatisfiedLinkError) {
-            // expected
         }
+
+        assertTrue(
+            failure is NativeLibraryException || failure is UnsatisfiedLinkError,
+            "Expected native library load failure but was ${failure::class.qualifiedName}",
+        )
     }
 
     @Test
