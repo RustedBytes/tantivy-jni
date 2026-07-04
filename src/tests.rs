@@ -749,3 +749,666 @@ fn delete_all_documents_clears_index() {
     assert_eq!(after["hits"].as_array().unwrap().len(), 0);
     close_index(handle).unwrap();
 }
+
+#[test]
+fn search_with_reload_before_search() {
+    let handle = open_index(
+        ":memory:",
+        &schema_json(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap();
+
+    add_documents(
+        handle,
+        &json!({
+            "documents": [
+                {
+                    "fields": {
+                        "title": [{ "type": "text", "value": "test reload" }],
+                        "id": [{ "type": "string", "value": "1" }],
+                        "price": [{ "type": "i64", "value": 10 }]
+                    }
+                }
+            ]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    commit(handle).unwrap();
+    // Intentionally omit refresh(handle)
+
+    // Using reloadBeforeSearch
+    let result = search(
+        handle,
+        &json!({
+            "query": "reload",
+            "limit": 10,
+            "reloadBeforeSearch": true
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let result: JsonValue = serde_json::from_str(&result).unwrap();
+    let hits = result["hits"].as_array().unwrap();
+    assert_eq!(hits.len(), 1);
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn raw_tokenizer_mode() {
+    let schema = json!({
+        "fields": [
+            { "name": "title", "type": "text", "stored": true, "indexed": true, "tokenizer": "raw" }
+        ],
+        "defaultSearchFields": ["title"]
+    })
+    .to_string();
+
+    let handle = open_index(
+        ":memory:",
+        &schema,
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap();
+
+    add_documents(
+        handle,
+        &json!({
+            "documents": [{
+                "fields": {
+                    "title": [{ "type": "text", "value": "Hello World" }]
+                }
+            }]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    commit_and_refresh(handle).unwrap();
+
+    // Querying for "Hello" should yield 0 hits because it's stored as "Hello World"
+    let result1 = search(
+        handle,
+        &json!({ "query": "Hello", "limit": 10 }).to_string(),
+    )
+    .unwrap();
+    let result1: JsonValue = serde_json::from_str(&result1).unwrap();
+    assert_eq!(result1["hits"].as_array().unwrap().len(), 0);
+
+    // Querying for exactly "Hello World" might need quotes or exact match, but we can search exactly
+    let result2 = search(
+        handle,
+        &json!({ "query": "\"Hello World\"", "limit": 10 }).to_string(),
+    )
+    .unwrap();
+    let result2: JsonValue = serde_json::from_str(&result2).unwrap();
+    assert_eq!(result2["hits"].as_array().unwrap().len(), 1);
+
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn boolean_and_phrase_queries() {
+    let handle = open_index(
+        ":memory:",
+        &schema_json(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap();
+
+    add_documents(
+        handle,
+        &json!({
+            "documents": [
+                {
+                    "fields": {
+                        "title": [{ "type": "text", "value": "apple orange" }],
+                        "id": [{ "type": "string", "value": "1" }],
+                        "price": [{ "type": "i64", "value": 10 }]
+                    }
+                },
+                {
+                    "fields": {
+                        "title": [{ "type": "text", "value": "apple banana" }],
+                        "id": [{ "type": "string", "value": "2" }],
+                        "price": [{ "type": "i64", "value": 15 }]
+                    }
+                }
+            ]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    commit_and_refresh(handle).unwrap();
+
+    // Must have apple, must NOT have banana
+    let result = search(
+        handle,
+        &json!({ "query": "+apple -banana", "limit": 10 }).to_string(),
+    )
+    .unwrap();
+    let result: JsonValue = serde_json::from_str(&result).unwrap();
+    let hits = result["hits"].as_array().unwrap();
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0]["fields"]["id"][0]["value"].as_str(), Some("1"));
+
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn reject_malformed_query() {
+    let handle = open_index(
+        ":memory:",
+        &schema_json(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap();
+
+    let error = search(
+        handle,
+        &json!({ "query": "\"", "limit": 10 }).to_string(), // Malformed query
+    )
+    .unwrap_err();
+    assert!(matches!(error, NativeError::Search(_)));
+
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn delete_numeric_term() {
+    let handle = open_index(
+        ":memory:",
+        &schema_json(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    )
+    .unwrap();
+
+    add_documents(
+        handle,
+        &json!({
+            "documents": [
+                {
+                    "fields": {
+                        "title": [{ "type": "text", "value": "keep" }],
+                        "id": [{ "type": "string", "value": "1" }],
+                        "price": [{ "type": "i64", "value": 100 }]
+                    }
+                },
+                {
+                    "fields": {
+                        "title": [{ "type": "text", "value": "delete" }],
+                        "id": [{ "type": "string", "value": "2" }],
+                        "price": [{ "type": "i64", "value": 200 }]
+                    }
+                }
+            ]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    commit_and_refresh(handle).unwrap();
+
+    // Delete document with price 200
+    crate::delete_term(
+        handle,
+        "price",
+        &json!({ "type": "i64", "value": 200 }).to_string(),
+    )
+    .unwrap();
+    commit_and_refresh(handle).unwrap();
+
+    let result = search(
+        handle,
+        &json!({ "query": "*", "limit": 10 }).to_string(),
+    )
+    .unwrap();
+    let result: JsonValue = serde_json::from_str(&result).unwrap();
+    let hits = result["hits"].as_array().unwrap();
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0]["fields"]["id"][0]["value"].as_str(), Some("1"));
+
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn all_field_types_indexing_and_retrieval() {
+    let handle = open_index(
+        ":memory:",
+        &json!({
+            "fields": [
+                { "name": "title", "type": "text", "stored": true, "indexed": true },
+                { "name": "u64_val", "type": "u64", "stored": true, "indexed": true, "fast": true },
+                { "name": "f64_val", "type": "f64", "stored": true, "indexed": true, "fast": true },
+                { "name": "bool_val", "type": "bool", "stored": true, "indexed": true, "fast": true },
+                { "name": "bytes_val", "type": "bytes", "stored": true, "indexed": true, "fast": true }
+            ],
+            "defaultSearchFields": ["title"]
+        }).to_string(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    ).unwrap();
+
+    add_documents(
+        handle,
+        &json!({
+            "documents": [
+                {
+                    "fields": {
+                        "title": [{ "type": "text", "value": "test types" }],
+                        "u64_val": [{ "type": "u64", "value": 42 }],
+                        "f64_val": [{ "type": "f64", "value": 3.14 }],
+                        "bool_val": [{ "type": "bool", "value": true }],
+                        "bytes_val": [{ "type": "bytes", "value": [104, 101, 108, 108, 111] }] // "hello"
+                    }
+                }
+            ]
+        }).to_string(),
+    ).unwrap();
+    commit_and_refresh(handle).unwrap();
+
+    let result = search(handle, &json!({ "query": "test", "limit": 10 }).to_string()).unwrap();
+    let result: JsonValue = serde_json::from_str(&result).unwrap();
+    let hits = result["hits"].as_array().unwrap();
+    assert_eq!(hits.len(), 1);
+    
+    let doc_fields = &hits[0]["fields"];
+    assert_eq!(doc_fields["u64_val"][0]["value"].as_u64(), Some(42));
+    assert_eq!(doc_fields["f64_val"][0]["value"].as_f64(), Some(3.14));
+    assert_eq!(doc_fields["bool_val"][0]["value"].as_bool(), Some(true));
+    
+    let bytes_arr = doc_fields["bytes_val"][0]["value"].as_array().unwrap();
+    assert_eq!(bytes_arr.len(), 5);
+    assert_eq!(bytes_arr[0].as_u64(), Some(104));
+
+    // Test delete by each of these numeric/bool terms
+    crate::delete_term(handle, "u64_val", &json!({ "type": "u64", "value": 42 }).to_string()).unwrap();
+    crate::delete_term(handle, "f64_val", &json!({ "type": "f64", "value": 3.14 }).to_string()).unwrap();
+    crate::delete_term(handle, "bool_val", &json!({ "type": "bool", "value": true }).to_string()).unwrap();
+    crate::delete_term(handle, "bytes_val", &json!({ "type": "bytes", "value": [104, 101, 108, 108, 111] }).to_string()).unwrap();
+
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn delete_json_field_fails() {
+    let handle = open_index(
+        ":memory:",
+        &json!({
+            "fields": [
+                { "name": "meta", "type": "json", "stored": true, "indexed": true }
+            ],
+            "defaultSearchFields": ["meta"]
+        }).to_string(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    ).unwrap();
+
+    let err = crate::delete_term(handle, "meta", &json!({ "type": "json", "value": {} }).to_string()).unwrap_err();
+    assert!(matches!(err, NativeError::Write(_)));
+
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn reject_invalid_json_values_for_types() {
+    let handle = open_index(
+        ":memory:",
+        &json!({
+            "fields": [
+                { "name": "u64_val", "type": "u64", "stored": true, "indexed": true },
+                { "name": "f64_val", "type": "f64", "stored": true, "indexed": true },
+                { "name": "bool_val", "type": "bool", "stored": true, "indexed": true },
+                { "name": "bytes_val", "type": "bytes", "stored": true, "indexed": true }
+            ],
+            "defaultSearchFields": []
+        }).to_string(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    ).unwrap();
+
+    // Wrong type for u64
+    assert!(matches!(
+        add_documents(handle, &json!({ "documents": [{ "fields": { "u64_val": [{ "type": "u64", "value": "string" }] } }] }).to_string()).unwrap_err(),
+        NativeError::Write(_)
+    ));
+
+    // Wrong type for f64
+    assert!(matches!(
+        add_documents(handle, &json!({ "documents": [{ "fields": { "f64_val": [{ "type": "f64", "value": "string" }] } }] }).to_string()).unwrap_err(),
+        NativeError::Write(_)
+    ));
+
+    // Wrong type for bool
+    assert!(matches!(
+        add_documents(handle, &json!({ "documents": [{ "fields": { "bool_val": [{ "type": "bool", "value": "string" }] } }] }).to_string()).unwrap_err(),
+        NativeError::Write(_)
+    ));
+
+    // Wrong type for bytes
+    assert!(matches!(
+        add_documents(handle, &json!({ "documents": [{ "fields": { "bytes_val": [{ "type": "bytes", "value": "string" }] } }] }).to_string()).unwrap_err(),
+        NativeError::Write(_)
+    ));
+
+    // Out of bounds byte value
+    assert!(matches!(
+        add_documents(handle, &json!({ "documents": [{ "fields": { "bytes_val": [{ "type": "bytes", "value": [256] }] } }] }).to_string()).unwrap_err(),
+        NativeError::Write(_)
+    ));
+
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn reject_oversized_search_offset() {
+    let handle = open_index(
+        ":memory:",
+        &schema_json(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    ).unwrap();
+
+    let err = search(
+        handle,
+        &json!({ "query": "test", "limit": 10, "offset": 100001 }).to_string(),
+    ).unwrap_err();
+    assert!(matches!(err, NativeError::Search(_)));
+
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn reject_unknown_snippet_field() {
+    let handle = open_index(
+        ":memory:",
+        &schema_json(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    ).unwrap();
+
+    let err = search(
+        handle,
+        &json!({ "query": "test", "limit": 10, "snippetFields": ["unknown"] }).to_string(),
+    ).unwrap_err();
+    assert!(matches!(err, NativeError::Search(_)));
+
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn reject_not_stored_selected_field() {
+    let handle = open_index(
+        ":memory:",
+        &json!({
+            "fields": [
+                { "name": "title", "type": "text", "stored": true, "indexed": true },
+                { "name": "hidden", "type": "text", "stored": false, "indexed": true }
+            ],
+            "defaultSearchFields": ["title"]
+        }).to_string(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    ).unwrap();
+
+    let err = search(
+        handle,
+        &json!({ "query": "test", "limit": 10, "selectedFields": ["hidden"] }).to_string(),
+    ).unwrap_err();
+    assert!(matches!(err, NativeError::Search(_)));
+
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn test_sorting_u64_and_f64_and_asc() {
+    let handle = open_index(
+        ":memory:",
+        &json!({
+            "fields": [
+                { "name": "title", "type": "text", "stored": true, "indexed": true },
+                { "name": "u64_val", "type": "u64", "stored": true, "indexed": true, "fast": true },
+                { "name": "f64_val", "type": "f64", "stored": true, "indexed": true, "fast": true }
+            ],
+            "defaultSearchFields": ["title"]
+        }).to_string(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    ).unwrap();
+
+    add_documents(
+        handle,
+        &json!({
+            "documents": [
+                { "fields": { "title": [{ "type": "text", "value": "test" }], "u64_val": [{ "type": "u64", "value": 10 }], "f64_val": [{ "type": "f64", "value": 1.1 }] } },
+                { "fields": { "title": [{ "type": "text", "value": "test" }], "u64_val": [{ "type": "u64", "value": 20 }], "f64_val": [{ "type": "f64", "value": 2.2 }] } }
+            ]
+        }).to_string(),
+    ).unwrap();
+    commit_and_refresh(handle).unwrap();
+
+    // Sort u64 Asc
+    let res = search(handle, &json!({ "query": "test", "limit": 10, "sort": { "field": "u64_val", "order": "asc" } }).to_string()).unwrap();
+    let res: JsonValue = serde_json::from_str(&res).unwrap();
+    let hits = res["hits"].as_array().unwrap();
+    assert_eq!(hits[0]["fields"]["u64_val"][0]["value"].as_u64(), Some(10));
+
+    // Sort f64 Desc
+    let res = search(handle, &json!({ "query": "test", "limit": 10, "sort": { "field": "f64_val", "order": "desc" } }).to_string()).unwrap();
+    let res: JsonValue = serde_json::from_str(&res).unwrap();
+    let hits = res["hits"].as_array().unwrap();
+    assert_eq!(hits[0]["fields"]["f64_val"][0]["value"].as_f64(), Some(2.2));
+
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn reject_sort_by_unsupported_fast_field() {
+    let handle = open_index(
+        ":memory:",
+        &json!({
+            "fields": [
+                { "name": "title", "type": "text", "stored": true, "indexed": true },
+                { "name": "date_val", "type": "date", "stored": true, "indexed": true, "fast": true }
+            ],
+            "defaultSearchFields": ["title"]
+        }).to_string(),
+        &json!({ "create": true, "writerThreads": 1, "writerMemoryBytes": 50000000 }).to_string(),
+    ).unwrap();
+
+    let err = search(
+        handle,
+        &json!({ "query": "test", "limit": 10, "sort": { "field": "date_val", "order": "asc" } }).to_string(),
+    ).unwrap_err();
+    assert!(matches!(err, NativeError::Search(_)));
+
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn test_default_values_deserialization() {
+    // Omitting create, writerThreads, writerMemoryBytes
+    let handle = open_index(
+        ":memory:",
+        &json!({
+            "fields": [{ "name": "title", "type": "text", "stored": true, "indexed": true }],
+            "defaultSearchFields": ["title"]
+        }).to_string(),
+        "{}",
+    ).unwrap();
+
+    // Omitting limit, offset, defaultFields, selectedFields, sort, countOnly, snippetFields
+    let res = search(handle, &json!({ "query": "test" }).to_string()).unwrap();
+    let res: JsonValue = serde_json::from_str(&res).unwrap();
+    assert_eq!(res["hits"].as_array().unwrap().len(), 0);
+
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn reject_oversized_writer_memory() {
+    let err = open_index(
+        ":memory:",
+        &schema_json(),
+        &json!({ "writerMemoryBytes": 1024 * 1024 * 1024 }).to_string(),
+    ).unwrap_err();
+    assert!(matches!(err, NativeError::Open(_)));
+}
+
+#[test]
+fn reject_undersized_writer_memory() {
+    let err = open_index(
+        ":memory:",
+        &schema_json(),
+        &json!({ "writerMemoryBytes": 1000 }).to_string(),
+    ).unwrap_err();
+    assert!(matches!(err, NativeError::Open(_)));
+}
+
+#[test]
+fn reject_oversized_writer_threads() {
+    let err = open_index(
+        ":memory:",
+        &schema_json(),
+        &json!({ "writerThreads": 100 }).to_string(),
+    ).unwrap_err();
+    assert!(matches!(err, NativeError::Open(_)));
+}
+
+#[test]
+fn reject_too_many_documents_in_batch() {
+    let handle = open_index(
+        ":memory:",
+        &schema_json(),
+        "{}",
+    ).unwrap();
+
+    let mut docs = Vec::new();
+    for _ in 0..10_001 {
+        docs.push(json!({ "fields": { "title": [{ "type": "text", "value": "test" }] } }));
+    }
+
+    let err = add_documents(
+        handle,
+        &json!({ "documents": docs }).to_string(),
+    ).unwrap_err();
+    assert!(matches!(err, NativeError::Write(_)));
+
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn reject_too_many_field_values_in_document() {
+    let handle = open_index(
+        ":memory:",
+        &schema_json(),
+        "{}",
+    ).unwrap();
+
+    let mut vals = Vec::new();
+    for _ in 0..10_001 {
+        vals.push(json!({ "type": "text", "value": "test" }));
+    }
+
+    let err = add_documents(
+        handle,
+        &json!({ "documents": [{ "fields": { "title": vals } }] }).to_string(),
+    ).unwrap_err();
+    assert!(matches!(err, NativeError::Write(_)));
+
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn reject_delete_term_with_unknown_field() {
+    let handle = open_index(
+        ":memory:",
+        &schema_json(),
+        "{}",
+    ).unwrap();
+
+    let err = crate::delete_term(
+        handle,
+        "unknown_field",
+        &json!({ "type": "string", "value": "test" }).to_string(),
+    ).unwrap_err();
+    assert!(matches!(err, NativeError::Write(_)));
+
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn reject_delete_query_with_unknown_default_field() {
+    let handle = open_index(
+        ":memory:",
+        &schema_json(),
+        "{}",
+    ).unwrap();
+
+    let err = crate::delete_query(
+        handle,
+        "test",
+        &json!(["unknown_field"]).to_string(),
+    ).unwrap_err();
+    assert!(matches!(err, NativeError::Write(_)));
+
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn reject_delete_query_with_empty_fields_overall() {
+    let handle = open_index(
+        ":memory:",
+        &json!({
+            "fields": [
+                { "name": "u64_val", "type": "u64", "stored": true, "indexed": true }
+            ],
+            "defaultSearchFields": []
+        }).to_string(),
+        "{}",
+    ).unwrap();
+
+    let err = crate::delete_query(
+        handle,
+        "test",
+        &json!([]).to_string(),
+    ).unwrap_err();
+    assert!(matches!(err, NativeError::Write(_)));
+
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn reject_add_documents_with_unknown_field() {
+    let handle = open_index(
+        ":memory:",
+        &schema_json(),
+        "{}",
+    ).unwrap();
+
+    let err = add_documents(
+        handle,
+        &json!({
+            "documents": [
+                {
+                    "fields": {
+                        "unknown": [{ "type": "text", "value": "test" }]
+                    }
+                }
+            ]
+        }).to_string(),
+    ).unwrap_err();
+    assert!(matches!(err, NativeError::Write(_)));
+
+    close_index(handle).unwrap();
+}
+
+#[test]
+fn reject_malformed_json_in_delete_query() {
+    let handle = open_index(
+        ":memory:",
+        &schema_json(),
+        "{}",
+    ).unwrap();
+
+    let err = crate::delete_query(
+        handle,
+        "test",
+        "{invalid}",
+    ).unwrap_err();
+    assert!(matches!(err, NativeError::Json(_)));
+
+    close_index(handle).unwrap();
+}
