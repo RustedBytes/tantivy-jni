@@ -127,15 +127,6 @@ jobs:
           PUBLISH_ARTIFACT=false \
           scripts/verify-maven-consumer.sh
 
-      - name: Publish To GitHub Packages
-        run: |
-          ./gradlew \
-            -PVERSION_NAME="${RELEASE_VERSION}" \
-            :tantivy-android:publishReleasePublicationToGitHubPackagesRepository
-        env:
-          GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Verify Release Artifacts
         run: |
           set -euo pipefail
