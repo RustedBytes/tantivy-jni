@@ -1,5 +1,8 @@
 # Tantivy JNI
 
+[![Rust](https://github.com/RustedBytes/tantivy-jni/actions/workflows/rust.yml/badge.svg)](https://github.com/RustedBytes/tantivy-jni/actions/workflows/rust.yml)
+[![Android Kotlin](https://github.com/RustedBytes/tantivy-jni/actions/workflows/android.yml/badge.svg)](https://github.com/RustedBytes/tantivy-jni/actions/workflows/android.yml)
+
 Android-first Kotlin bindings for [Tantivy](https://github.com/quickwit-oss/tantivy), backed by Rust through JNI.
 
 The library exposes a typed Kotlin API with coroutine-friendly indexing and search operations. Native calls remain synchronous and blocking internally; Kotlin dispatches them through caller-configurable coroutine dispatchers.
