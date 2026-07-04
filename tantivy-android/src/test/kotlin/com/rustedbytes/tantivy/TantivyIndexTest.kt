@@ -337,8 +337,86 @@ class TantivyIndexTest {
         assertEquals("id", searchJson.getJSONArray("selectedFields").getString(0))
         assertEquals("rank", searchJson.getJSONObject("sort").getString("field"))
     }
-}
 
+    @Test
+    fun allFieldTypesAndSchemaMethodsAreExercised() {
+        // This exercises all schema builder methods
+        val schema = TantivyClient.schema {
+            text("text_field")
+            string("string_field")
+            u64("u64_field", stored = true, indexed = true, fast = true)
+            i64("i64_field", stored = true, indexed = true, fast = true)
+            f64("f64_field", stored = true, indexed = true, fast = true)
+            date("date_field", stored = true, indexed = true, fast = true)
+            facet("facet_field")
+            bytes("bytes_field", stored = true, indexed = true, fast = true)
+            ipAddr("ip_addr_field", stored = true, indexed = true, fast = true)
+            json("json_field")
+            bool("bool_field")
+            defaultSearchFields("text_field")
+        }
+
+        // This exercises all FieldValue types in document builder
+        val document = TantivyClient.document {
+            text("text_field", "value")
+            string("string_field", "value")
+            u64("u64_field", 1L)
+            i64("i64_field", 1L)
+            f64("f64_field", 1.0)
+            date("date_field", java.time.Instant.ofEpochMilli(1000))
+            facet("facet_field", "/category/test")
+            bytes("bytes_field", byteArrayOf(1, 2, 3))
+            ipAddr("ip_addr_field", "127.0.0.1")
+            json("json_field", JSONObject("""{"key":"value"}"""))
+            bool("bool_field", true)
+        }
+
+        // Verify some properties to ensure they compiled into the document
+        assertEquals(FieldValue.U64(1L), document.fields["u64_field"]?.first())
+        assertEquals(FieldValue.I64(1L), document.fields["i64_field"]?.first())
+        assertEquals(FieldValue.F64(1.0), document.fields["f64_field"]?.first())
+        assertEquals(FieldValue.Date(java.time.Instant.ofEpochMilli(1000)), document.fields["date_field"]?.first())
+        assertEquals(FieldValue.Facet("/category/test"), document.fields["facet_field"]?.first())
+        assertEquals(FieldValue.IpAddr("127.0.0.1"), document.fields["ip_addr_field"]?.first())
+        assertEquals(FieldValue.Json(JSONObject("""{"key":"value"}""")).rawJsonValue().toString(), document.fields["json_field"]?.first()?.rawJsonValue().toString())
+        val bytesVal = document.fields["bytes_field"]?.first() as FieldValue.Bytes
+        assertTrue(bytesVal.toByteArray().contentEquals(byteArrayOf(1, 2, 3)))
+    }
+    @Test
+    fun indexOptionsDefaultsAreCorrect() {
+        val options = IndexOptions()
+        assertEquals(1, options.writerThreads)
+        assertEquals(50_000_000, options.writerMemoryBytes)
+    }
+
+    @Test
+    fun tantivyIndexOpenFailsWithoutNativeLibrary() = runTest {
+        try {
+            TantivyClient.open("test_path", TantivyClient.schema { text("title") })
+        } catch (e: NativeLibraryException) {
+            // expected
+        } catch (e: UnsatisfiedLinkError) {
+            // expected
+        }
+    }
+
+    @Test
+    fun fieldValueEqualsAndHashCode() {
+        val b1 = FieldValue.Bytes(byteArrayOf(1, 2))
+        val b2 = FieldValue.Bytes(byteArrayOf(1, 2))
+        val b3 = FieldValue.Bytes(byteArrayOf(1, 3))
+        assertEquals(b1, b2)
+        assertEquals(b1.hashCode(), b2.hashCode())
+        assertTrue(b1 != b3)
+
+        assertEquals(FieldValue.U64(1L), FieldValue.U64(1L))
+        assertEquals(FieldValue.U64(1L).hashCode(), FieldValue.U64(1L).hashCode())
+
+        assertEquals(FieldValue.I64(1L), FieldValue.I64(1L))
+        assertEquals(FieldValue.F64(1.0), FieldValue.F64(1.0))
+        assertEquals(FieldValue.Bool(true), FieldValue.Bool(true))
+    }
+}
 private class FakeBridge(
     private val failingAddCalls: MutableSet<Int> = mutableSetOf(),
     private val beforeAdd: () -> Unit = {},

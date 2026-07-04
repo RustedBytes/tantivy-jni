@@ -4,6 +4,7 @@ plugins {
     id("maven-publish")
     id("org.jetbrains.dokka")
     id("signing")
+    id("jacoco")
 }
 
 android {
@@ -55,6 +56,23 @@ detekt {
             "src/test/kotlin",
             "src/androidTest/kotlin",
         ),
+    )
+}
+
+tasks.register<JacocoReport>("jacocoTestReport") {
+    dependsOn("testDebugUnitTest")
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+    classDirectories.setFrom(
+        fileTree("build/intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes")
+    )
+    sourceDirectories.setFrom(
+        files("src/main/kotlin")
+    )
+    executionData.setFrom(
+        files("build/outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec", "build/jacoco/testDebugUnitTest.exec")
     )
 }
 
