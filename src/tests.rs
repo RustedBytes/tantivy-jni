@@ -991,7 +991,7 @@ fn all_field_types_indexing_and_retrieval() {
                     "fields": {
                         "title": [{ "type": "text", "value": "test types" }],
                         "u64_val": [{ "type": "u64", "value": 42 }],
-                        "f64_val": [{ "type": "f64", "value": 3.14 }],
+                        "f64_val": [{ "type": "f64", "value": 42.42 }],
                         "bool_val": [{ "type": "bool", "value": true }],
                         "bytes_val": [{ "type": "bytes", "value": [104, 101, 108, 108, 111] }] // "hello"
                     }
@@ -1010,7 +1010,7 @@ fn all_field_types_indexing_and_retrieval() {
 
     let doc_fields = &hits[0]["fields"];
     assert_eq!(doc_fields["u64_val"][0]["value"].as_u64(), Some(42));
-    assert_eq!(doc_fields["f64_val"][0]["value"].as_f64(), Some(3.14));
+    assert_eq!(doc_fields["f64_val"][0]["value"].as_f64(), Some(42.42));
     assert_eq!(doc_fields["bool_val"][0]["value"].as_bool(), Some(true));
 
     let bytes_arr = doc_fields["bytes_val"][0]["value"].as_array().unwrap();
@@ -1027,7 +1027,7 @@ fn all_field_types_indexing_and_retrieval() {
     crate::delete_term(
         handle,
         "f64_val",
-        &json!({ "type": "f64", "value": 3.14 }).to_string(),
+        &json!({ "type": "f64", "value": 42.42 }).to_string(),
     )
     .unwrap();
     crate::delete_term(
