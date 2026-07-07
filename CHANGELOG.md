@@ -12,6 +12,7 @@ This project follows semantic versioning after the first stable `1.0.0` release.
 - Added `scripts/build-ios-native.sh` to build the native `TantivyFFI.xcframework` (iOS device, iOS simulator, and macOS slices).
 - Added a C header and module map (`include/`) for the Swift module.
 - Added a Swift iOS CI workflow that builds the XCFramework and runs Swift tests.
+- Added a tag-based iOS release workflow that publishes the zipped `TantivyFFI.xcframework` with a SwiftPM checksum for remote `binaryTarget` consumption.
 
 ## 0.1.0 - 2026-07-02
 

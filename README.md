@@ -217,6 +217,22 @@ If `SIGNING_KEY` and `SIGNING_PASSWORD` are configured in the release environmen
 
 For tag `v0.1.0`, the published Maven version is `0.1.0`.
 
+The same tag also runs `.github/workflows/release-ios.yml` on macOS, which builds and tests the Swift package and uploads to the same release:
+
+- the zipped `TantivyFFI.xcframework` (iOS device, iOS simulator, and macOS slices)
+- its SwiftPM checksum plus a ready-to-paste `binaryTarget(url:checksum:)` snippet
+- SHA-256 checksums
+
+Consumers can then depend on the framework remotely:
+
+```swift
+.binaryTarget(
+    name: "CTantivyFFI",
+    url: "https://github.com/rustedbytes/tantivy-jni/releases/download/v0.1.0/TantivyFFI-v0.1.0.xcframework.zip",
+    checksum: "<published checksum>"
+)
+```
+
 ## Compatibility Policy
 
 Until 1.0, the high-level coroutine API is intended to remain source-compatible across patch releases unless a changelog entry calls out a migration. APIs annotated with `@AdvancedTantivyApi`, native JSON contracts, and release artifact layout may change between minor pre-1.0 versions.
