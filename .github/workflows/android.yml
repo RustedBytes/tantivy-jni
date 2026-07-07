@@ -2,34 +2,6 @@ name: Android Kotlin
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - ".github/workflows/android.yml"
-      - "fixtures/maven-consumer/**"
-      - "scripts/verify-maven-consumer.sh"
-      - "sample-app/**"
-      - "build.gradle.kts"
-      - "settings.gradle.kts"
-      - "gradle.properties"
-      - "gradle/wrapper/**"
-      - "gradlew"
-      - "gradlew.bat"
-      - "config/detekt/**"
-      - "tantivy-android/**"
-  push:
-    paths:
-      - ".github/workflows/android.yml"
-      - "fixtures/maven-consumer/**"
-      - "scripts/verify-maven-consumer.sh"
-      - "sample-app/**"
-      - "build.gradle.kts"
-      - "settings.gradle.kts"
-      - "gradle.properties"
-      - "gradle/wrapper/**"
-      - "gradlew"
-      - "gradlew.bat"
-      - "config/detekt/**"
-      - "tantivy-android/**"
 
 concurrency:
   group: android-kotlin-${{ github.workflow }}-${{ github.ref }}

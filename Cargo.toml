@@ -7,7 +7,9 @@ license = "Apache-2.0"
 
 [lib]
 name = "tantivy_jni"
-crate-type = ["cdylib", "rlib"]
+# staticlib is added for Apple platforms: the iOS/macOS XCFramework links the
+# crate as a static archive (no JVM present). cdylib remains for Android JNI.
+crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
 jni = "0.22.4"

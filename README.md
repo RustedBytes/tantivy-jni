@@ -2,10 +2,14 @@
 
 [![Rust](https://github.com/RustedBytes/tantivy-jni/actions/workflows/rust.yml/badge.svg)](https://github.com/RustedBytes/tantivy-jni/actions/workflows/rust.yml)
 [![Android Kotlin](https://github.com/RustedBytes/tantivy-jni/actions/workflows/android.yml/badge.svg)](https://github.com/RustedBytes/tantivy-jni/actions/workflows/android.yml)
+[![Swift iOS](https://github.com/RustedBytes/tantivy-jni/actions/workflows/ios.yml/badge.svg)](https://github.com/RustedBytes/tantivy-jni/actions/workflows/ios.yml)
 
-Android-first Kotlin bindings for [Tantivy](https://github.com/quickwit-oss/tantivy), backed by Rust through JNI.
+Kotlin (Android) and Swift (iOS/macOS) bindings for [Tantivy](https://github.com/quickwit-oss/tantivy), backed by the same Rust core.
 
-The library exposes a typed Kotlin API with coroutine-friendly indexing and search operations. Native calls remain synchronous and blocking internally; Kotlin dispatches them through caller-configurable coroutine dispatchers.
+On Android the core is reached through JNI; on Apple platforms it is reached through a C ABI and packaged as an XCFramework. Both bindings expose a typed API with builder DSLs and share the same JSON wire contract, so behavior is consistent across platforms.
+
+- **Android / Kotlin** — coroutine-friendly indexing and search. Native calls are synchronous and blocking internally; Kotlin dispatches them through caller-configurable coroutine dispatchers. See [docs/API.md](docs/API.md).
+- **iOS / macOS / Swift** — the `TantivyKit` Swift package with `async`/`await` (and synchronous) index and search operations. See [docs/IOS.md](docs/IOS.md).
 
 ## Demo in sample-app
 
@@ -149,6 +153,42 @@ val page = index.search(
 
 See [docs/API.md](docs/API.md) for the full API guide.
 See [docs/PRODUCTION.md](docs/PRODUCTION.md) for release gates and production-readiness checks.
+
+## iOS / macOS (Swift)
+
+Build the native XCFramework, then use the `TantivyKit` Swift package in `tantivy-ios`:
+
+```bash
+scripts/build-ios-native.sh   # writes tantivy-ios/TantivyFFI.xcframework
+cd tantivy-ios && swift test
+```
+
+```swift
+import TantivyKit
+
+let schema = TantivyClient.schema { s in
+    s.string("id")
+    s.text("title", defaultSearch: true)
+    s.i64("publishedAt", fast: true)
+}
+
+let index = try await TantivyClient.open(path: indexDir.path, schema: schema)
+
+try await index.add(TantivyClient.document { d in
+    d.string("id", "1")
+    d.text("title", "Tantivy on iOS")
+    d.i64("publishedAt", Int64(Date().timeIntervalSince1970 * 1000))
+})
+_ = try await index.commitAndRefresh()
+
+let page = try await index.search(TantivyClient.query { q in
+    q.query = "ios"
+    q.selectedFields("id", "title")
+    q.sortBy("publishedAt", .desc)
+})
+```
+
+See [docs/IOS.md](docs/IOS.md) for the full Swift guide.
 
 ## Release
 

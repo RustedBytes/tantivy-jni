@@ -1,0 +1,4 @@
+module CTantivyFFI {
+    header "tantivy_ffi.h"
+    export *
+}

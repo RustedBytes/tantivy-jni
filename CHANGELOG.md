@@ -6,6 +6,13 @@ This project follows semantic versioning after the first stable `1.0.0` release.
 
 ## Unreleased
 
+- Added a C ABI (`src/ffi_bridge.rs`) over the same core operations as the JNI bridge, for non-JVM consumers.
+- Added `staticlib` to the crate output for Apple static linking.
+- Added the `TantivyKit` Swift package (`tantivy-ios`) with a typed iOS/macOS API mirroring the Kotlin bindings, including `async`/`await` index and search operations.
+- Added `scripts/build-ios-native.sh` to build the native `TantivyFFI.xcframework` (iOS device, iOS simulator, and macOS slices).
+- Added a C header and module map (`include/`) for the Swift module.
+- Added a Swift iOS CI workflow that builds the XCFramework and runs Swift tests.
+
 ## 0.1.0 - 2026-07-02
 
 - Added Android Kotlin API backed by Rust/Tantivy through JNI.

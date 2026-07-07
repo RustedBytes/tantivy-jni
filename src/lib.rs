@@ -1,5 +1,6 @@
 mod document;
 mod error;
+mod ffi_bridge;
 mod jni_bridge;
 mod lifecycle;
 mod model;
@@ -17,6 +18,7 @@ pub(crate) use writing::{
     refresh, schema_info,
 };
 
+pub use ffi_bridge::*;
 pub use jni_bridge::*;
 
 #[cfg(test)]
