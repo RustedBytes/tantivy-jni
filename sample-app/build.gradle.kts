@@ -36,7 +36,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 
-    androidTestImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.2.21")
+    androidTestImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.4.10")
     androidTestImplementation("androidx.test:core:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.7.0")
